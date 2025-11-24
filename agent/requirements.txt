@@ -1,0 +1,17 @@
+playwright
+crawl4ai
+serpapi
+pillow
+nest-asyncio
+google-search-results
+selenium
+langchain>=0.2.0
+langchain-aws
+boto3
+langgraph
+faiss-gpu
+pandas
+langchain-community
+tldextract
+furl
+ollama
