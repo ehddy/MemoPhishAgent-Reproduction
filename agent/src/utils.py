@@ -7,7 +7,7 @@ from urllib.parse import urlparse
 import boto3
 import tldextract
 from botocore.config import Config
-from langchain_aws.chat_models import ChatBedrock
+from langchain_aws import ChatBedrockConverse
 from serpapi import GoogleSearch
 
 # AWS & Model configuration
@@ -30,9 +30,9 @@ def get_bedrock_client() -> Any:
     return boto3.client("bedrock-runtime", region_name=AWS_REGION, config=config)
 
 
-def get_llm(client: Any, callbacks: Optional[List[Any]] = None) -> ChatBedrock:
+def get_llm(client: Any, callbacks: Optional[List[Any]] = None) -> ChatBedrockConverse:
     """Instantiate the Bedrock-backed LLM."""
-    return ChatBedrock(client=client, model_id=MODEL_ID, callbacks=callbacks)
+    return ChatBedrockConverse(client=client, model=MODEL_ID, callbacks=callbacks)
 
 
 def extract_json_from_llm_output(output: str) -> Dict:

@@ -21,13 +21,21 @@
 This fork was created to **reproduce the experiments** described in the paper above.
 The goal is to verify the reported results and gain a deeper understanding of the system.
 
-Key differences from the original:
+Key differences from the original (environment-specific changes):
 
-- Model backend updated to `us.anthropic.claude-sonnet-4-6` (AWS Bedrock inference profile)
-- Uses `ChatBedrockConverse` for inference profile support
-- LangChain v1.x import compatibility fixes applied
-- S3 private bucket lookups disabled (original authors' private resource)
-- `.gitignore` and `.example` config templates added for safe sharing
+| 항목 | 원본 코드 | 이 재현본 |
+| --- | --- | --- |
+| LLM 클래스 | `ChatBedrock` | `ChatBedrockConverse` (inference profile 지원) |
+| 모델 ID | `anthropic.claude-3-sonnet-20240229-v1:0` | `global.anthropic.claude-sonnet-4-6` (최신 모델) |
+| AWS 리전 | `us-east-1` | `us-east-1` (동일) |
+| LangChain 임포트 | `langchain.schema`, `langchain.tools` | `langchain_core.messages`, `langchain_core.tools` (v1.x 호환) |
+| S3 FAISS 룩업 | 활성화 (저자 private 버킷) | 비활성화 (`None`) — 접근 불가 |
+| 설정 파일 | `serpAPI_key.txt`, `test_urls.txt` 직접 커밋 | `.gitignore`로 제외, `.example` 템플릿 제공 |
+
+> The original paper uses `ChatBedrock` with `anthropic.claude-3-sonnet-20240229-v1:0`.
+> This reproduction uses `ChatBedrockConverse` with `global.anthropic.claude-sonnet-4-6`
+> because the newer Claude models on AWS Bedrock require cross-region inference profiles
+> (prefixed with `us.` or `global.`) and the `ChatBedrockConverse` API class to work correctly.
 
 ---
 
