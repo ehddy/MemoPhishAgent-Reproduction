@@ -25,17 +25,16 @@ Key differences from the original (environment-specific changes):
 
 | 항목 | 원본 코드 | 이 재현본 |
 | --- | --- | --- |
-| LLM 클래스 | `ChatBedrock` | `ChatBedrockConverse` (inference profile 지원) |
-| 모델 ID | `anthropic.claude-3-sonnet-20240229-v1:0` | `global.anthropic.claude-sonnet-4-6` (최신 모델) |
+| LLM 클래스 | `ChatBedrock` | `ChatBedrock` (동일) |
+| 모델 ID | `anthropic.claude-3-sonnet-20240229-v1:0` | `global.anthropic.claude-sonnet-4-6` (최신 모델로 교체) |
 | AWS 리전 | `us-east-1` | `us-east-1` (동일) |
 | LangChain 임포트 | `langchain.schema`, `langchain.tools` | `langchain_core.messages`, `langchain_core.tools` (v1.x 호환) |
 | S3 FAISS 룩업 | 활성화 (저자 private 버킷) | 비활성화 (`None`) — 접근 불가 |
 | 설정 파일 | `serpAPI_key.txt`, `test_urls.txt` 직접 커밋 | `.gitignore`로 제외, `.example` 템플릿 제공 |
 
-> The original paper uses `ChatBedrock` with `anthropic.claude-3-sonnet-20240229-v1:0`.
-> This reproduction uses `ChatBedrockConverse` with `global.anthropic.claude-sonnet-4-6`
-> because the newer Claude models on AWS Bedrock require cross-region inference profiles
-> (prefixed with `us.` or `global.`) and the `ChatBedrockConverse` API class to work correctly.
+> The original paper uses `anthropic.claude-3-sonnet-20240229-v1:0` which is a legacy model.
+> This reproduction uses `global.anthropic.claude-sonnet-4-6` (a cross-region inference profile)
+> to access the latest Claude model via AWS Bedrock.
 
 ---
 
