@@ -13,8 +13,10 @@ from langchain_core.messages import HumanMessage, SystemMessage
 from callbacks import get_token_usage_callbacks
 from utils import MODEL_ID
 
+# max_screenshot_chars 추가
+max_screenshot_chars = 30000
 
-async def crawl_and_judge(urls, llm, max_text_chars=2000, max_screenshot_chars=100000):
+async def crawl_and_judge(urls, llm, max_text_chars=2000, max_screenshot_chars=max_screenshot_chars):
     """Crawls a list of URLs and uses an LLM to determine if each URL is malicious.
 
     Each URL is processed by crawling its page, extracting raw markdown and a screenshot,
@@ -102,13 +104,34 @@ async def crawl_and_judge(urls, llm, max_text_chars=2000, max_screenshot_chars=1
                 ai_msg = llm.invoke(messages)
                 print(ai_msg.content)
 
+                # # Parse the LLM response
+                # try:
+                #     verdict = json.loads(ai_msg.content)
+                #     if verdict.get("malicious"):
+                #         malicious_urls.append(url)
+                # except json.JSONDecodeError:
+                #     print(f"❌ Failed to parse LLM response for {url}")
+
+                # --- 여기서부터 수정 ---
+                raw_content = ai_msg.content.strip()
+
+                # 마크다운 코드 블록(```json ... ```) 제거
+                if "```json" in raw_content:
+                    raw_content = raw_content.split("```json")[1].split("```")[0].strip()
+                elif "```" in raw_content:
+                    raw_content = raw_content.split("```")[1].split("```")[0].strip()
+
                 # Parse the LLM response
                 try:
-                    verdict = json.loads(ai_msg.content)
+                    verdict = json.loads(raw_content)
                     if verdict.get("malicious"):
                         malicious_urls.append(url)
+                        print(f"✅ Flagged as malicious: {url}")
+                    else:
+                        print(f"✔️ Safe: {url}")
                 except json.JSONDecodeError:
                     print(f"❌ Failed to parse LLM response for {url}")
+                    print(f"Debug Raw Content: {raw_content[:200]}...") # 에러 시 내용 확인용
 
             except botocore.exceptions.ClientError as e:
                 error_code = e.response["Error"]["Code"]
@@ -160,7 +183,9 @@ async def main_async(input_path, output_path):
     avg_time = total_time / len(urls) if urls else 0
 
     # Save malicious URLs
-    os.makedirs(os.path.dirname(output_path), exist_ok=True)
+    output_dir = os.path.dirname(output_path)
+    if output_dir: # 폴더 경로가 있을 때만 생성
+        os.makedirs(output_dir, exist_ok=True)
     with open(output_path, "w") as file:
         for line in malicious:
             file.write(line + "\n")

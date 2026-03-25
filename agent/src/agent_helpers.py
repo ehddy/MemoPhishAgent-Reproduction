@@ -6,8 +6,8 @@ from typing import Any, Literal, cast
 
 import botocore
 import botocore.exceptions
-from langchain.schema import HumanMessage
-from langchain.tools import BaseTool
+from langchain_core.messages import HumanMessage  # [FIXED] langchain.schema removed in v1.x
+from langchain_core.tools import BaseTool  # [FIXED] langchain.tools removed in v1.x
 from langchain_aws.chat_models import ChatBedrock
 from langchain_core.messages import AIMessage
 from langchain_core.runnables import RunnableConfig

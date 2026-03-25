@@ -1,4 +1,4 @@
-from langchain.schema import SystemMessage
+from langchain_core.messages import SystemMessage  # [FIXED] langchain.schema removed in v1.x
 
 SYSTEM_JUDGE = SystemMessage(
     content="""

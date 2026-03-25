@@ -12,7 +12,8 @@ from serpapi import GoogleSearch
 
 # AWS & Model configuration
 AWS_REGION = "us-east-1"
-MODEL_ID = "anthropic.claude-3-sonnet"
+# MODEL_ID = "anthropic.claude-3-sonnet-20240229-v1:0"  # [LEGACY] blocked for new users
+MODEL_ID = "global.anthropic.claude-sonnet-4-6"
 with open("serpAPI_key.txt", "r") as f:
     API_KEY = f.read().strip()
 
@@ -22,7 +23,7 @@ def get_bedrock_client() -> Any:
     config = Config(
         read_timeout=2000,
         retries={
-            "max_attempts": 50,  # total tries
+            "max_attempts": 5,  # total tries
             "mode": "adaptive",  # AWS will back off *for you* based on load
         },
     )
@@ -257,3 +258,17 @@ def ai_overview_preprocess(url, llm):
             return judgment
     # no overview → skip
     return None
+
+
+# 새로 추가
+def get_bedrock_image_type(image_bytes: bytes) -> str:
+    """이미지 바이너리를 체크하여 Bedrock이 지원하는 MIME 타입을 반환합니다."""
+    if image_bytes.startswith(b'\x89PNG\r\n\x1a\n'):
+        return "image/png"
+    elif image_bytes.startswith(b'\xff\xd8'):
+        return "image/jpeg"
+    elif image_bytes.startswith(b'GIF87a') or image_bytes.startswith(b'GIF89a'):
+        return "image/gif"
+    elif image_bytes.startswith(b'RIFF') and image_bytes[8:12] == b'WEBP':
+        return "image/webp"
+    return "image/jpeg" # 기본값
