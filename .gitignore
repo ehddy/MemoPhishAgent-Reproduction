@@ -1,0 +1,49 @@
+# API keys & secrets
+agent/serpAPI_key.txt
+agent/aws_credentials.txt
+*.key.txt
+*.secret.txt
+
+# Test input files
+agent/test_urls.txt
+agent/*.txt
+!agent/requirements.txt
+
+# Output / result files
+agent/result.json
+agent/result_raw.json
+agent/result_failed_urls.txt
+agent/*_raw.json
+agent/*_failed_urls.txt
+agent/data*.json
+
+# Work directory outputs
+agent/work/
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.pytest_cache/
+.mypy_cache/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Docker
+.docker/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log

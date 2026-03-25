@@ -12,8 +12,9 @@ import httpx
 import pandas as pd
 from crawl4ai import AsyncWebCrawler, CacheMode, CrawlerRunConfig
 from furl import furl
-from langchain.schema import Document, HumanMessage
-from langchain.tools import BaseTool, Tool, tool
+from langchain_core.messages import HumanMessage  # [FIXED] langchain.schema removed in v1.x
+from langchain_core.documents import Document
+from langchain_core.tools import BaseTool, Tool, tool  # [FIXED] langchain.tools removed in v1.x
 from langchain_community.embeddings import BedrockEmbeddings
 from langchain_community.utilities import SerpAPIWrapper
 from langchain_community.vectorstores import FAISS
@@ -22,7 +23,7 @@ from pydantic import BaseModel, Field
 
 from prompts import SYSTEM_EXTRACT, SYSTEM_JUDGE, SYSTEM_JUDGE_IMG, SYSTEM_SCREEN
 from state import URLState
-from utils import AWS_REGION, find_all_link_urls, find_image_urls
+from utils import AWS_REGION, find_all_link_urls, find_image_urls, get_bedrock_image_type
 
 logger = logging.getLogger(__name__)
 
@@ -400,32 +401,62 @@ class CheckImageTool(BaseTool):
     def __init__(self, chat: Any):
         super().__init__(chat=chat)
 
+    # async def _arun(self, img_url: str) -> Dict[str, str]:
+    #     image_data = base64.b64encode(httpx.get(img_url).content).decode("utf-8")
+    #     response = httpx.get(img_url)
+    #     img_type = response.headers["Content-Type"]
+    #     messages = [
+    #         {
+    #             "role": "user",
+    #             "content": [
+    #                 {
+    #                     "type": "text",
+    #                     "text": "Describe this image.",
+    #                 },
+    #                 {
+    #                     "type": "image",
+    #                     "source": {
+    #                         "type": "base64",
+    #                         "media_type": img_type,
+    #                         "data": image_data,
+    #                     },
+    #                 },
+    #             ],
+    #         }
+    #     ]
+    #     resp = await self.chat.ainvoke(messages)
+
+    #     return {"image_url": img_url, "description": resp.content}
+
     async def _arun(self, img_url: str) -> Dict[str, str]:
-        image_data = base64.b64encode(httpx.get(img_url).content).decode("utf-8")
-        response = httpx.get(img_url)
-        img_type = response.headers["Content-Type"]
+        async with httpx.AsyncClient() as client:
+            resp = await client.get(img_url, follow_redirects=True)
+            resp.raise_for_status()
+            img_bytes = resp.content
+
+        # 실제 바이너리 데이터를 분석하여 타입 결정
+        img_type = get_bedrock_image_type(img_bytes)
+        image_b64 = base64.b64encode(img_bytes).decode("utf-8")
+
         messages = [
             {
                 "role": "user",
                 "content": [
-                    {
-                        "type": "text",
-                        "text": "Describe this image.",
-                    },
+                    {"type": "text", "text": "Describe this image."},
                     {
                         "type": "image",
                         "source": {
                             "type": "base64",
-                            "media_type": img_type,
-                            "data": image_data,
+                            "media_type": img_type, # 동적으로 감지된 타입 사용
+                            "data": image_b64,
                         },
                     },
                 ],
             }
         ]
-        resp = await self.chat.ainvoke(messages)
-
-        return {"image_url": img_url, "description": resp.content}
+        resp_llm = await self.chat.ainvoke(messages)
+        return {"image_url": img_url, "description": resp_llm.content}
+    
 
     def _run(self, *args, **kwargs):
         raise NotImplementedError(
@@ -700,19 +731,21 @@ class AgentTools:
         self.check_img = CheckImageTool(llm)
         self.judge_img = make_judge_image(llm)
         self.serpapi_search = serpapi_tool
-        # historicals
-        self.domain_lookup = build_lookbook_retriever_from_s3(
-            "guardians-cipher",
-            k=3,
-            score_threshold=0.2,
-            faiss_path="faiss_url_domain_db",
-        )
-        self.content_lookup = build_lookbook_retriever_from_s3(
-            "guardians-cipher",
-            k=3,
-            score_threshold=0.5,
-            faiss_path="faiss_url_content_db",
-        )
+        # historicals - [DISABLED] requires private S3 bucket "guardians-cipher" (authors' internal bucket)
+        # self.domain_lookup = build_lookbook_retriever_from_s3(
+        #     "guardians-cipher",
+        #     k=3,
+        #     score_threshold=0.2,
+        #     faiss_path="faiss_url_domain_db",
+        # )
+        # self.content_lookup = build_lookbook_retriever_from_s3(
+        #     "guardians-cipher",
+        #     k=3,
+        #     score_threshold=0.5,
+        #     faiss_path="faiss_url_content_db",
+        # )
+        self.domain_lookup = None
+        self.content_lookup = None
 
     async def lookup_malicious_url_tool(self, url: str) -> str:
         """

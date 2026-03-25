@@ -128,7 +128,10 @@ def build_full_agent(
     )
 
     # now wire up the StateGraph
+    # react_builder = StateGraph(ReactURLState, input=ReactURLState, config_schema=config)
     react_builder = StateGraph(ReactURLState, input=ReactURLState, config_schema=config)
+    # input -> input_schema
+    # config_schema -> context_schema
     if use_memory:
         logging.info("Building graph with memory.")
         react_builder.add_node("prepare_memory", memory_nodes.prepare_memory)
