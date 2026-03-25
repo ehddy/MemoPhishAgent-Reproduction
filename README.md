@@ -2,6 +2,9 @@
 
 > **이 저장소는 아래 논문을 재현하기 위해 원본 [MemoPhishAgent](https://github.com/memophishagent/MemoPhishAgent)를 개인적으로 fork한 것입니다.
 > 논문에서 제안하는 시스템을 직접 구현·실행해보며 결과를 검증하는 것이 목적입니다.**
+>
+> **This is a personal reproduction fork of the original [MemoPhishAgent](https://github.com/memophishagent/MemoPhishAgent) repository.
+> The purpose is to reproduce the experiments described in the paper below, verify the reported results, and gain a deeper understanding of the system.**
 
 ## Paper
 
