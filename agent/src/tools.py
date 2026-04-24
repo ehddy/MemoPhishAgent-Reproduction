@@ -39,13 +39,31 @@ with open("serpAPI_key.txt", "r") as f:
     api_key = f.read().strip()
 
 serpapi = SerpAPIWrapper(serpapi_api_key=api_key)
+
+def serpapi_search_with_fallback(query: str) -> str:
+    """
+    Wrapper for SerpAPI that gracefully handles errors when no results are found.
+    """
+    logging.info(f"🔎 [SerpAPI Tool] Searching: {query}")
+    try:
+        result = serpapi.run(query)
+        logging.info(f"✅ [SerpAPI Tool] Found {len(result)} chars of results")
+        return result
+    except ValueError as e:
+        error_msg = str(e)
+        logging.warning(f"⚠️ [SerpAPI Tool] No results found: {error_msg}")
+        return f"No search results found for query: {query}. This might indicate an obscure or recently created domain."
+    except Exception as e:
+        logging.error(f"❌ [SerpAPI Tool] Unexpected error: {e}")
+        return f"Search failed with error: {str(e)}"
+
 serpapi_tool = Tool.from_function(
-    func=serpapi.run,  # method that takes a query string
-    name="serpapi_search",  # this is the name your agent will call
+    func=serpapi_search_with_fallback,
+    name="serpapi_search",
     description=(
         "Use this to look up facts on the web. "
         "Input: a search query (string). "
-        "Output: the combined text of the top search results."
+        "Output: the combined text of the top search results, or a message if no results found."
     ),
 )
 
