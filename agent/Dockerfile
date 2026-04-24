@@ -10,4 +10,6 @@ COPY . /work
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Install browser drivers (Chromium, Firefox, WebKit)
-RUN playwright install
+RUN playwright install 
+
+RUN pip install --upgrade crawl4ai rich
