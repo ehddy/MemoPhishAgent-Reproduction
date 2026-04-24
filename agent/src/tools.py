@@ -25,6 +25,9 @@ from prompts import SYSTEM_EXTRACT, SYSTEM_JUDGE, SYSTEM_JUDGE_IMG, SYSTEM_SCREE
 from state import URLState
 from utils import AWS_REGION, find_all_link_urls, find_image_urls, get_bedrock_image_type
 
+import re
+from langchain_core.messages import SystemMessage
+
 logger = logging.getLogger(__name__)
 
 MAX_CHARS = 5_000  # keep payload LLM-safe (≈ 1 k-tokens)
@@ -671,16 +674,11 @@ class CheckScreenshotTool(BaseTool):
             img.save(buf, format="JPEG", quality=60, optimize=True)
             compressed_b64 = base64.b64encode(buf.getvalue()).decode("utf-8")
 
-            # Step 2: call your LLM
+            # Step 2: Build messages with proper LangChain message types
             messages = [
-                {"role": "system", "content": SYSTEM_SCREEN.content},
-                {
-                    "role": "user",
-                    "content": [
-                        {
-                            "type": "text",
-                            "text": "Analyze whether this screenshot is a phishing site.",
-                        },
+                SystemMessage(content=SYSTEM_SCREEN.content),
+                HumanMessage(
+                    content=[
                         {
                             "type": "image",
                             "source": {
@@ -689,8 +687,16 @@ class CheckScreenshotTool(BaseTool):
                                 "data": compressed_b64,
                             },
                         },
-                    ],
-                },
+                        {
+                            "type": "text",
+                            "text": (
+                                "Analyze whether this screenshot is a phishing site. "
+                                "Respond with ONLY a JSON object, no other text: "
+                                '{"malicious": bool, "confidence": int(0-5), "notes": "one sentence"}'
+                            ),
+                        },
+                    ]
+                ),
             ]
         except Exception as e:
             logging.info("read image failed: %s", e)
@@ -706,12 +712,23 @@ class CheckScreenshotTool(BaseTool):
         # Step 3: parse JSON or return safe fallback
         try:
             return json.loads(resp.content)
-        except (json.JSONDecodeError, AttributeError) as e:
-            return {
-                "malicious": False,
-                "confidence": 0,
-                "notes": "Failed to parse model response.",
-            }
+        except (json.JSONDecodeError, AttributeError):
+            pass
+
+        # Step 3-1: Extract JSON block when mixed with surrounding text
+        try:
+            match = re.search(r'\{.*\}', resp.content, re.DOTALL)
+            if match:
+                return json.loads(match.group())
+        except (json.JSONDecodeError, ValueError, AttributeError):
+            pass
+
+        logging.warning("check_screenshot parse failed. Raw response: %s", resp.content[:300])
+        return {
+            "malicious": False,
+            "confidence": 0,
+            "notes": "Failed to parse model response.",
+        }
 
     def _run(self, *args, **kwargs):
         # if someone calls sync, you can either:

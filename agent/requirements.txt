@@ -9,7 +9,7 @@ langchain>=0.2.0
 langchain-aws
 boto3
 langgraph
-faiss-gpu
+faiss-cpu
 pandas
 langchain-community
 tldextract
