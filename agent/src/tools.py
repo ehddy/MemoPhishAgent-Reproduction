@@ -98,7 +98,8 @@ class CrawlContentTool(BaseTool):
             logging.info(f"🔗 [Crawl Tool] URL missing protocol, trying: {candidates}")
 
         # 2) Crawl with JS
-        async with AsyncWebCrawler() as crawler:
+        # Disable verbose logging to prevent I/O errors in Docker
+        async with AsyncWebCrawler(verbose=False) as crawler:
             js_code = [
                 """
                     (() => {
@@ -670,7 +671,8 @@ class CheckScreenshotTool(BaseTool):
         else:
             candidates = [f"{p}{url}" for p in prefixes]
 
-        async with AsyncWebCrawler() as crawler:
+        # Disable verbose logging to prevent I/O errors in Docker
+        async with AsyncWebCrawler(verbose=False) as crawler:
 
             js_code = [
                 """
