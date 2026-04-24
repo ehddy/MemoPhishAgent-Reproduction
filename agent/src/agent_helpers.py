@@ -42,13 +42,17 @@ class ReactNodes:
         self.react_agent = None
 
     async def call_model(self, state: ReactURLState) -> dict[str, list[AIMessage]]:
+        logging.info(f"📞 [call_model] Invoking LLM for URL: {state.url}")
         model = self.llm.bind_tools(self.my_tools)
         system_message = self.SYSTEM_REACT
-        logger.info(f"Find related memory: {state.memory_snippet}")
+
+        if state.memory_snippet:
+            logging.info(f"💾 [Memory] Found related memory snippets")
+            logger.info(f"Find related memory: {state.memory_snippet}")
 
         # memory‐based override
         if state.memory_majority:
-            logging.info(f"Majority of the memories are malicious")
+            logging.info(f"🎯 [Memory Override] Majority of the memories are malicious - using majority vote")
             verdict = {
                 "url": state.url,
                 "malicious": True,
@@ -58,6 +62,7 @@ class ReactNodes:
             answer = AIMessage(
                 content=json.dumps({"verdicts": [verdict]}),
             )
+            logging.info(f"✅ [Memory Override] Verdict: MALICIOUS (confidence: 5)")
             return {"messages": [answer]}
 
         if state.memory_snippet:
@@ -69,24 +74,36 @@ class ReactNodes:
 
         # build prompt
         if not state.messages:
+            logging.info(f"🆕 [Prompt] Building initial prompt for URL analysis")
             human = {
                 "role": "user",
                 "content": f"Judge if this URL {state.url} is malicious or phishing site.",
             }
             prompt = [{"role": "system", "content": system_message}, human]
         else:
+            logging.info(f"🔄 [Prompt] Continuing conversation (message count: {len(state.messages)})")
             prompt = [{"role": "system", "content": system_message}, *state.messages]
 
+        logging.info(f"🤖 [LLM] Sending request to Bedrock...")
         response = cast(
             AIMessage,
             await model.ainvoke(prompt),
         )
+
+        # Log tool calls
+        if response.tool_calls:
+            tool_names = [tc["name"] for tc in response.tool_calls]
+            logging.info(f"🔧 [LLM Response] Agent wants to use tools: {', '.join(tool_names)}")
+        else:
+            logging.info(f"✍️ [LLM Response] Agent provided final answer (no tool calls)")
+
         # disable screenshot for clarity
         if response.tool_calls and response.tool_calls[0]["name"] == "crawl_content":
             response.tool_calls[0]["args"]["screenshot"] = False
 
         # out of steps
         if state.is_last_step and response.tool_calls:
+            logging.warning(f"⚠️ [Recursion Limit] Reached maximum steps, returning incomplete answer")
             return {
                 "messages": [
                     AIMessage(
@@ -106,10 +123,13 @@ class ReactNodes:
 
         # still wants a tool?
         if last_msg.tool_calls:
+            logging.info(f"➡️ [Router] Routing to tools node")
             return "tools"
 
         # final answer — decide where to land
-        return "store_memory" if state.use_memory else "__end__"
+        next_node = "store_memory" if state.use_memory else "__end__"
+        logging.info(f"➡️ [Router] Agent finished, routing to: {next_node}")
+        return next_node
 
     async def react_judge_node(self, state: URLState) -> dict[str, Any]:
         if self.react_agent is None:
@@ -135,6 +155,7 @@ class ReactNodes:
                 else:
                     logging.info("  No AI Overview available, proceeding to full agent analysis...")
 
+            logging.info(f"🚀 [Agent Start] Initializing ReAct agent for URL analysis")
             agent_input = {
                 "messages": [
                     HumanMessage(
@@ -149,10 +170,13 @@ class ReactNodes:
             tool_sequence = []
             try:
                 # Run the async ReAct agent
+                step_count = 0
                 async for step in self.react_agent.astream(
                     agent_input, config=self.config, stream_mode="values"
                 ):
+                    step_count += 1
                     last_msg = step["messages"][-1]
+                    logging.info(f"📨 [Agent Step {step_count}] Message from: {type(last_msg).__name__}")
                     step["messages"][-1].pretty_print()
 
                     # record any tool_calls on this LLM message
@@ -160,19 +184,27 @@ class ReactNodes:
                         for call in last_msg.tool_calls:
                             step["tool_sequence"].append(call["name"])
                             tool_sequence.append(call["name"])
+                            logging.info(f"  🔧 Tool queued: {call['name']}")
 
                 # pick up memory_case
                 final_memory_case = step.get("memory_case", " ")
                 final_msg = last_msg.content
                 logging.info("===" * 50)
+                logging.info(f"🏁 [Agent Complete] Total steps: {step_count}")
+                logging.info(f"🔧 [Tools Used] {', '.join(tool_sequence) if tool_sequence else 'None'}")
+
                 verdicts.append({"url": url, "reason": final_msg})
                 final_json = extract_and_fix(final_msg)
                 try:
+                    logging.info(f"📋 [Parsing] Extracting JSON verdict from response...")
                     for v in final_json[0]["verdicts"]:
                         v["memory_case"] = final_memory_case
                         jsons.append(v)
+                        logging.info(f"✅ [Verdict] URL: {v.get('url')}")
+                        logging.info(f"   Malicious: {v.get('malicious')}, Confidence: {v.get('confidence')}/5")
+                        logging.info(f"   Reason: {v.get('reason')}")
                 except Exception as e:
-                    logging.info(f"Error {e}")
+                    logging.error(f"❌ [Parse Error] Failed to extract verdict: {e}")
                     failed_urls.append(url)
                     continue
 

@@ -243,20 +243,38 @@ def analyze_with_llm(llm, text, url):
 
 
 def ai_overview_preprocess(url, llm):
+    import logging
+    logging.info(f"🔍 [AI Overview] Starting Google AI Overview search for: {url}")
+
     if should_skip(url):
+        logging.info(f"⏭️ [AI Overview] Skipping domain (self-hosted/shortener): {url}")
         # leave those "do-it-yourself" hosting platforms and URL-shortening services for agent judgment.
         return None
+
     # try each query until we get an ai_overview
     domain, brand = extract_domain_and_brand(url)
-    for q in make_queries(domain, brand):
+    logging.info(f"🏷️ [AI Overview] Extracted domain: {domain}, brand: {brand}")
+
+    queries = make_queries(domain, brand)
+    for i, q in enumerate(queries, 1):
+        logging.info(f"🔎 [AI Overview Query {i}/{len(queries)}] Searching: {q}")
         overview = fetch_ai_overview_for_query(q)
         if overview:
+            logging.info(f"✅ [AI Overview] Found AI Overview for query: {q}")
             # only now do we extract text and call the LLM
             text = extract_text(overview)
+            logging.info(f"📝 [AI Overview] Extracted {len(text)} chars from AI Overview")
+            logging.info(f"🤖 [AI Overview] Sending to LLM for analysis...")
             judgment = analyze_with_llm(llm, text, url)
+            if judgment:
+                logging.info(f"✅ [AI Overview] LLM verdict: Malicious={judgment.get('malicious')}, Confidence={judgment.get('confidence')}")
             # include URL and query for traceability
             return judgment
+        else:
+            logging.info(f"⚠️ [AI Overview Query {i}/{len(queries)}] No AI Overview found")
+
     # no overview → skip
+    logging.info(f"❌ [AI Overview] No AI Overview available for {url} after {len(queries)} queries")
     return None
 
 

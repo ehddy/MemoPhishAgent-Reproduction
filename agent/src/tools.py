@@ -69,12 +69,15 @@ class CrawlContentTool(BaseTool):
     args_schema: type = CrawlContentInput
 
     async def _arun(self, url: str, screenshot: bool = False) -> Dict[str, Any]:
+        logging.info(f"🕷️ [Crawl Tool] Starting crawl for: {url} (screenshot: {screenshot})")
+
         # 1) Try adding http:// or https:// if missing
         prefixes = ("http://", "https://")
         if any(url.startswith(p) for p in prefixes):
             candidates = [url]
         else:
             candidates = [f"{p}{url}" for p in prefixes]
+            logging.info(f"🔗 [Crawl Tool] URL missing protocol, trying: {candidates}")
 
         # 2) Crawl with JS
         async with AsyncWebCrawler() as crawler:
@@ -96,10 +99,15 @@ class CrawlContentTool(BaseTool):
 
             for candidate in candidates:
                 try:
+                    logging.info(f"🌐 [Crawl Tool] Attempting to fetch: {candidate}")
                     result = await crawler.arun(candidate, config=config)
                     snippet = result.markdown.raw_markdown[:MAX_CHARS]
+                    text_length = len(snippet)
+                    logging.info(f"✅ [Crawl Tool] Successfully fetched {text_length} chars from {candidate}")
+
                     if screenshot:
                         screenshot_truncated = result.screenshot[:MAX_IMG]
+                        logging.info(f"📸 [Crawl Tool] Screenshot captured ({len(screenshot_truncated)} bytes)")
                         return {
                             "url": candidate,
                             "text": snippet,
@@ -109,10 +117,11 @@ class CrawlContentTool(BaseTool):
                         return {"url": candidate, "text": snippet}
 
                 except Exception as e:
-                    logging.info(f"❌ Error crawling {candidate}: {e}")
+                    logging.warning(f"❌ [Crawl Tool] Error crawling {candidate}: {e}")
                     continue
 
         # 3) Fallback if all attempts failed
+        logging.error(f"❌ [Crawl Tool] All crawl attempts failed for: {url}")
         if screenshot:
             fallback: Dict[str, Any] = {
                 "url": url,
@@ -635,6 +644,8 @@ class CheckScreenshotTool(BaseTool):
         super().__init__(chat=chat)
 
     async def _arun(self, url: str) -> Dict[str, Any]:
+        logging.info(f"📸 [Screenshot Tool] Capturing screenshot for: {url}")
+
         prefixes = ["http://", "https://"]
         if any(url.startswith(p) for p in prefixes):
             candidates = [url]
@@ -660,14 +671,17 @@ class CheckScreenshotTool(BaseTool):
             )
             for candidate_url in candidates:
                 try:
+                    logging.info(f"📷 [Screenshot Tool] Attempting screenshot of: {candidate_url}")
                     result = await crawler.arun(candidate_url, config=config)
                     screenshot = result.screenshot
+                    logging.info(f"✅ [Screenshot Tool] Screenshot captured successfully")
                     break
 
                 except Exception as e:
-                    logging.info(f"❌ Error crawling {candidate_url}: {e}")
+                    logging.warning(f"❌ [Screenshot Tool] Error capturing {candidate_url}: {e}")
                     continue
         try:
+            logging.info(f"🖼️ [Screenshot Tool] Processing and compressing screenshot...")
             raw = base64.b64decode(screenshot)
             img = Image.open(BytesIO(raw)).resize((256, 256), Image.LANCZOS)
             buf = BytesIO()
@@ -699,7 +713,7 @@ class CheckScreenshotTool(BaseTool):
                 ),
             ]
         except Exception as e:
-            logging.info("read image failed: %s", e)
+            logging.error(f"❌ [Screenshot Tool] Image processing failed: {e}")
             return {
                 "url": url,
                 "malicious": False,
@@ -707,11 +721,14 @@ class CheckScreenshotTool(BaseTool):
                 "reason": "Failed to parse screenshot",
             }
 
+        logging.info(f"🤖 [Screenshot Tool] Sending screenshot to LLM for analysis...")
         resp = await self.chat.ainvoke(messages)
 
         # Step 3: parse JSON or return safe fallback
         try:
-            return json.loads(resp.content)
+            result = json.loads(resp.content)
+            logging.info(f"✅ [Screenshot Tool] Analysis complete - Malicious: {result.get('malicious')}, Confidence: {result.get('confidence')}/5")
+            return result
         except (json.JSONDecodeError, AttributeError):
             pass
 
@@ -719,11 +736,13 @@ class CheckScreenshotTool(BaseTool):
         try:
             match = re.search(r'\{.*\}', resp.content, re.DOTALL)
             if match:
-                return json.loads(match.group())
+                result = json.loads(match.group())
+                logging.info(f"✅ [Screenshot Tool] Analysis complete - Malicious: {result.get('malicious')}, Confidence: {result.get('confidence')}/5")
+                return result
         except (json.JSONDecodeError, ValueError, AttributeError):
             pass
 
-        logging.warning("check_screenshot parse failed. Raw response: %s", resp.content[:300])
+        logging.warning(f"⚠️ [Screenshot Tool] Failed to parse LLM response: {resp.content[:300]}")
         return {
             "malicious": False,
             "confidence": 0,
