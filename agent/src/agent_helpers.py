@@ -177,7 +177,14 @@ class ReactNodes:
                     step_count += 1
                     last_msg = step["messages"][-1]
                     logging.info(f"📨 [Agent Step {step_count}] Message from: {type(last_msg).__name__}")
-                    step["messages"][-1].pretty_print()
+
+                    # Pretty print with error handling for non-interactive environments
+                    try:
+                        step["messages"][-1].pretty_print()
+                    except (ValueError, OSError) as e:
+                        # Fallback to logging if pretty_print fails (e.g., in Docker)
+                        logging.debug(f"Unable to pretty_print (non-interactive env): {e}")
+                        logging.info(f"  Content preview: {str(last_msg.content)[:200]}...")
 
                     # record any tool_calls on this LLM message
                     if getattr(last_msg, "tool_calls", None):
