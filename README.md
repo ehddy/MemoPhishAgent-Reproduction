@@ -88,9 +88,7 @@ aws configure
 docker build -t memophish-agent .
 
 docker run --rm \
-  -v $(pwd)/serpAPI_key.txt:/app/serpAPI_key.txt:ro \
-  -v $(pwd)/test_urls.txt:/app/test_urls.txt:ro \
-  -v $(pwd)/result.json:/app/result.json \
+  -v $(pwd):/work \
   -e AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID \
   -e AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY \
   -e AWS_DEFAULT_REGION=us-east-1 \
