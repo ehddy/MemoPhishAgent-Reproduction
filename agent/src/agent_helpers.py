@@ -118,11 +118,22 @@ class ReactNodes:
         verdicts, jsons, failed_urls = [], [], []
         for i, url in enumerate(state["urls"]):
             if self.args.use_ai_overview:
+                logging.info(f"[{i+1}/{len(state['urls'])}] Checking URL via Google AI Overview: {url}")
                 ai_overview_res = ai_overview_preprocess(url, self.llm)
                 if ai_overview_res and ai_overview_res["malicious"]:
+                    logging.info(f"✓ Google AI Overview detected as MALICIOUS (confidence: {ai_overview_res.get('confidence', 'N/A')})")
+                    logging.info(f"  Reason: {ai_overview_res.get('reason', 'N/A')}")
+                    logging.info("===" * 50)
                     ai_overview_res["memory_case"] = "google_ai_overview"
                     jsons.append(ai_overview_res)
                     continue
+                elif ai_overview_res:
+                    logging.info(f"✓ Google AI Overview detected as BENIGN (confidence: {ai_overview_res.get('confidence', 'N/A')})")
+                    logging.info("===" * 50)
+                    jsons.append(ai_overview_res)
+                    continue
+                else:
+                    logging.info("  No AI Overview available, proceeding to full agent analysis...")
 
             agent_input = {
                 "messages": [
