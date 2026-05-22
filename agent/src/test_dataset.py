@@ -453,15 +453,7 @@ if __name__ == "__main__":
 
         for i, url in enumerate(urls, 1):
             url_start = time.time()
-            try:
-                result = await agent.ainvoke({"urls": [url]})
-            except Exception as e:
-                elapsed = round(time.time() - url_start, 2)
-                logging.warning(f"[{i}/{len(urls)}] 예외 발생, 스킵: {url} — {type(e).__name__}: {e}")
-                failed_urls.append(url)
-                with open(args.output, "w", encoding="utf-8") as f:
-                    json.dump({"results": json_result}, f, indent=2, ensure_ascii=False)
-                continue
+            result = await agent.ainvoke({"urls": [url]})
             elapsed = round(time.time() - url_start, 2)
 
             batch = result.get("json_result", [])

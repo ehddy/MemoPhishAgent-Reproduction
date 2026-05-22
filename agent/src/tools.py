@@ -459,10 +459,14 @@ class CheckImageTool(BaseTool):
     #     return {"image_url": img_url, "description": resp.content}
 
     async def _arun(self, img_url: str) -> Dict[str, str]:
-        async with httpx.AsyncClient() as client:
-            resp = await client.get(img_url, follow_redirects=True)
-            resp.raise_for_status()
-            img_bytes = resp.content
+        try:
+            async with httpx.AsyncClient(verify=False) as client:
+                resp = await client.get(img_url, follow_redirects=True, timeout=10.0)
+                resp.raise_for_status()
+                img_bytes = resp.content
+        except Exception as e:
+            logging.warning(f"check_img fetch failed ({img_url}): {e}")
+            return {"image_url": img_url, "description": "Failed to fetch image."}
 
         # 실제 바이너리 데이터를 분석하여 타입 결정
         img_type = get_bedrock_image_type(img_bytes)
