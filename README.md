@@ -204,21 +204,21 @@ python src/test_dataset.py \
 배치 평가 결과 TSV 두 개(피싱/정상)를 받아 분류 지표를 출력합니다.
 `folder == "unknown"` 행(에이전트가 자체 크롤한 서브 URL)과 동일 폴더 중복 행은 자동으로 제거합니다.
 
-```bash
-# Docker 환경 (agent/ 디렉터리에서)
-docker run --rm \
-  -v "$(pwd)/results":/work/results \
-  memophish-agent \
-  python evaluate.py \
-    --phish  results/openphish_result.tsv \
-    --benign results/tranco_result.tsv
+`--phish-failed` / `--benign-failed`를 추가하면 실패 URL도 집계에 포함됩니다
+(피싱 실패 → FN, 정상 실패 → TN).
 
-# Conda 로컬 환경
-conda activate memophish
-cd MemoPhishAgent-Reproduction/agent
+```bash
+# 기본 (TSV만)
 python evaluate.py \
   --phish  results/openphish_result.tsv \
   --benign results/tranco_result.tsv
+
+# 실패 URL 포함 (분모를 입력 수에 맞춤)
+python evaluate.py \
+  --phish  results/openphish_result.tsv \
+  --benign results/tranco_result.tsv \
+  --phish-failed  results/openphish_result_failed_urls.txt \
+  --benign-failed results/tranco_result_failed_urls.txt
 ```
 
 Sample output:
