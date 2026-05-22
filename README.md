@@ -201,7 +201,8 @@ python src/test_dataset.py \
 
 ### 6. Evaluate results
 
-배치 평가 결과 JSON 두 개(피싱/정상)를 받아 분류 지표와 토큰 사용량을 출력합니다.
+배치 평가 결과 TSV 두 개(피싱/정상)를 받아 분류 지표를 출력합니다.
+`folder == "unknown"` 행(에이전트가 자체 크롤한 서브 URL)과 동일 폴더 중복 행은 자동으로 제거합니다.
 
 ```bash
 # Docker 환경 (agent/ 디렉터리에서)
@@ -209,15 +210,15 @@ docker run --rm \
   -v "$(pwd)/results":/work/results \
   memophish-agent \
   python evaluate.py \
-    --phish  results/openphish_result.json \
-    --benign results/tranco_result.json
+    --phish  results/openphish_result.tsv \
+    --benign results/tranco_result.tsv
 
 # Conda 로컬 환경
 conda activate memophish
 cd MemoPhishAgent-Reproduction/agent
 python evaluate.py \
-  --phish  results/openphish_result.json \
-  --benign results/tranco_result.json
+  --phish  results/openphish_result.tsv \
+  --benign results/tranco_result.tsv
 ```
 
 Sample output:
@@ -237,21 +238,7 @@ Sample output:
     Precision : 0.8000
     Recall    : 0.8000
     F1 Score  : 0.8000
-
-  [Token & LLM Usage]
-    Total tokens      : 88,930  (in=79,800 / out=9,130)
-    Avg tokens / URL  : 4,446.5
-    Total LLM calls   : 43
-    Avg LLM calls/URL : 2.1
 ==================================================
-```
-
-샘플 JSON은 `results/samples/`에 있어 바로 테스트해볼 수 있습니다:
-
-```bash
-python evaluate.py \
-  --phish  results/samples/sample_openphish.json \
-  --benign results/samples/sample_tranco.json
 ```
 
 ---
