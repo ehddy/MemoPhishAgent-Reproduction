@@ -357,14 +357,20 @@ def build_dataset_agent(url_to_folder: Dict, args) -> Any:
 # TSV 결과 저장
 # ---------------------------------------------------------------------------
 
-def save_tsv(results: List[Dict], url_to_folder: Dict, tsv_path: str):
-    """판별 결과를 TSV 포맷으로 저장한다."""
+def save_tsv(results: List[Dict], url_to_folder: Dict, tsv_path: str,
+             input_urls: set = None):
+    """판별 결과를 TSV 포맷으로 저장한다.
+
+    input_urls가 제공되면 해당 URL만 valid 폴더로 기록하고,
+    입력 외 URL(서브링크 등)은 folder="unknown"으로 처리한다.
+    """
     os.makedirs(os.path.dirname(tsv_path) or ".", exist_ok=True)
     with open(tsv_path, "w", encoding="utf-8") as f:
         f.write("folder\turl\tprediction\tconfidence\treason\n")
         for r in results:
             url = r.get("url", "")
-            folder = url_to_folder.get(url)
+            in_input = (input_urls is None) or (url in input_urls)
+            folder = url_to_folder.get(url) if in_input else None
             folder_name = folder.name if folder else "unknown"
             prediction  = "phish" if r.get("malicious") else "benign"
             confidence  = r.get("confidence", "")
@@ -510,7 +516,7 @@ if __name__ == "__main__":
 
     # 4. TSV 저장
     tsv_path = f"{output_base}.tsv"
-    save_tsv(json_result, url_to_folder, tsv_path)
+    save_tsv(json_result, url_to_folder, tsv_path, input_urls=set(urls))
     logging.info(f"TSV 결과 저장: {tsv_path}")
 
     # 5. 실패 URL 저장
