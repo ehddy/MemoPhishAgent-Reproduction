@@ -1,0 +1,97 @@
+{
+  "results": [
+    {
+      "url": "http://count.mail.163.com.asianstonetech.com/qiye/",
+      "malicious": true,
+      "confidence": 5,
+      "reason": "Subdomain spoofing of 163.com (NetEase) on an unrelated domain 'asianstonetech.com'; hosts a credential-harvesting corporate email login form.",
+      "memory_case": " ",
+      "elapsed_sec": 25.83
+    },
+    {
+      "url": "http://roberthood.net/me/young/quak/bizmail.php?email=&lc=1033&id=64855&mkt=en-us&cbcxt=mai",
+      "malicious": true,
+      "confidence": 5,
+      "reason": "Impersonates Microsoft Outlook/Business Mail on an unrelated domain (roberthood.net); uses spoofed MS URL parameters and a credential-harvesting login form.",
+      "memory_case": " ",
+      "elapsed_sec": 31.26
+    },
+    {
+      "url": "https://shgcvdjcvdkgcdghc.freewww.info/cd99f9987f25da47c79043eddb83.php",
+      "malicious": true,
+      "confidence": 5,
+      "reason": "Impersonates NetEase Enterprise Email on a randomly-named free subdomain; obfuscated tracking parameters and credential-harvesting fields confirm spear-phishing.",
+      "memory_case": " ",
+      "elapsed_sec": 39.24
+    },
+    {
+      "url": "https://correos-z.top/",
+      "malicious": true,
+      "confidence": 5,
+      "reason": "Typosquat of Spain's official postal service (correos.es) on abuse-prone .top TLD; matches well-documented Correos smishing/phishing pattern.",
+      "memory_case": " ",
+      "elapsed_sec": 59.11
+    },
+    {
+      "url": "https://whatsapp.navegamenorca.menorcaon.es/login",
+      "malicious": true,
+      "confidence": 5,
+      "reason": "Phishing kit impersonating WhatsApp via subdomain abuse on an unrelated Spanish domain; bare Laravel credential-harvesting login form with no legitimate WhatsApp branding.",
+      "memory_case": " ",
+      "elapsed_sec": 50.19
+    },
+    {
+      "url": "https://secure-paypa1.com/signin/",
+      "malicious": true,
+      "confidence": 5,
+      "reason": "Typosquatted PayPal domain ('paypa1' with digit-1 substitution); hosts a fake PayPal login page designed to harvest account credentials.",
+      "memory_case": " ",
+      "elapsed_sec": 28.47
+    },
+    {
+      "url": "http://apple-id-verify.support/account/login",
+      "malicious": true,
+      "confidence": 4,
+      "reason": "Domain impersonates Apple ID verification service; non-Apple TLD (.support) with a fake Apple login form. No verifiable Apple affiliation.",
+      "memory_case": " ",
+      "elapsed_sec": 22.91
+    },
+    {
+      "url": "https://bankofamerica-secure.xyz/online/verify",
+      "malicious": true,
+      "confidence": 5,
+      "reason": "Fake Bank of America verification page on a suspicious .xyz domain; uses official BoA branding to steal banking credentials.",
+      "memory_case": " ",
+      "elapsed_sec": 34.62
+    },
+    {
+      "url": "https://dhl-tracking-update.site/parcel/confirm",
+      "malicious": false,
+      "confidence": 2,
+      "reason": "Page returned minimal content — could not confirm phishing elements. Domain is suspicious but insufficient evidence to classify as malicious.",
+      "memory_case": " ",
+      "elapsed_sec": 18.05
+    },
+    {
+      "url": "https://faceb00k-login.com/checkpoint/",
+      "malicious": false,
+      "confidence": 1,
+      "reason": "Page returned a 404 error. Site appears to be inactive; no content available for analysis.",
+      "memory_case": " ",
+      "elapsed_sec": 12.33
+    }
+  ],
+  "run_info": {
+    "total_urls": 10,
+    "completed": 10,
+    "failed": 0,
+    "total_elapsed_sec": 321.81,
+    "avg_elapsed_sec": 32.18,
+    "token_usage": {
+      "input_tokens": 48320,
+      "output_tokens": 5210,
+      "total_tokens": 53530
+    },
+    "llm_calls": 24
+  }
+}

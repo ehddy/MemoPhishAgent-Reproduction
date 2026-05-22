@@ -1,0 +1,97 @@
+{
+  "results": [
+    {
+      "url": "https://www.google.com/",
+      "malicious": false,
+      "confidence": 0,
+      "reason": "Well-known legitimate search engine; globally trusted domain with consistent branding, valid SSL, and no credential-harvesting indicators.",
+      "memory_case": " ",
+      "elapsed_sec": 14.21
+    },
+    {
+      "url": "https://www.amazon.com/",
+      "malicious": false,
+      "confidence": 0,
+      "reason": "Legitimate e-commerce platform; official Amazon domain with consistent branding and no phishing indicators.",
+      "memory_case": " ",
+      "elapsed_sec": 17.54
+    },
+    {
+      "url": "https://www.wikipedia.org/",
+      "malicious": false,
+      "confidence": 0,
+      "reason": "Non-profit encyclopedia with no login credential harvesting; well-known legitimate domain.",
+      "memory_case": " ",
+      "elapsed_sec": 11.83
+    },
+    {
+      "url": "https://www.naver.com/",
+      "malicious": false,
+      "confidence": 0,
+      "reason": "Korea's largest portal site; legitimate domain with consistent branding and no signs of impersonation or credential theft.",
+      "memory_case": " ",
+      "elapsed_sec": 13.67
+    },
+    {
+      "url": "https://www.bbc.com/",
+      "malicious": false,
+      "confidence": 0,
+      "reason": "Legitimate UK public broadcaster; no login forms targeting credential harvesting, well-established domain.",
+      "memory_case": " ",
+      "elapsed_sec": 16.42
+    },
+    {
+      "url": "https://www.github.com/",
+      "malicious": false,
+      "confidence": 0,
+      "reason": "Legitimate developer platform owned by Microsoft; standard login page with no spoofing indicators.",
+      "memory_case": " ",
+      "elapsed_sec": 19.88
+    },
+    {
+      "url": "https://www.linkedin.com/",
+      "malicious": false,
+      "confidence": 1,
+      "reason": "Legitimate professional networking platform; login page is consistent with official LinkedIn design. No impersonation detected.",
+      "memory_case": " ",
+      "elapsed_sec": 21.05
+    },
+    {
+      "url": "https://www.shopify.com/",
+      "malicious": false,
+      "confidence": 0,
+      "reason": "Legitimate e-commerce platform; official domain with no indicators of phishing or brand impersonation.",
+      "memory_case": " ",
+      "elapsed_sec": 15.93
+    },
+    {
+      "url": "https://www.adobe.com/",
+      "malicious": true,
+      "confidence": 3,
+      "reason": "Page presented a login prompt with a credential form. The domain is legitimate Adobe, but the specific landing path contained unusual redirect parameters that resemble phishing kit patterns. Flagged with low-medium confidence.",
+      "memory_case": " ",
+      "elapsed_sec": 27.14
+    },
+    {
+      "url": "https://www.dropbox.com/",
+      "malicious": true,
+      "confidence": 2,
+      "reason": "Login page content and form structure superficially resembled a credential-harvesting layout. Domain is legitimate Dropbox; likely a false positive due to similar UI pattern to phishing kits.",
+      "memory_case": " ",
+      "elapsed_sec": 23.76
+    }
+  ],
+  "run_info": {
+    "total_urls": 10,
+    "completed": 10,
+    "failed": 0,
+    "total_elapsed_sec": 181.43,
+    "avg_elapsed_sec": 18.14,
+    "token_usage": {
+      "input_tokens": 31480,
+      "output_tokens": 3920,
+      "total_tokens": 35400
+    },
+    "llm_calls": 19
+  }
+}

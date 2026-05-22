@@ -53,6 +53,11 @@ It leverages memory-augmented reasoning via LangGraph ReAct agents backed by AWS
 │   │   ├── graph.py            # Live URL inference entry point
 │   │   ├── test_dataset.py     # Offline batch evaluation (pre-collected datasets)
 │   │   └── ...
+│   ├── results/
+│   │   └── samples/
+│   │       ├── sample_openphish.json   # Sample phishing result (10 URLs, ground truth=True)
+│   │       └── sample_tranco.json      # Sample benign result (10 URLs, ground truth=False)
+│   ├── evaluate.py             # Offline evaluation metrics script
 │   ├── Dockerfile
 │   ├── requirements.txt
 │   ├── .env.example            # Environment variable template (AWS + SerpAPI)
@@ -193,6 +198,63 @@ python src/test_dataset.py \
   --use-memory false \
   --use-ai-overview false
 ```
+
+### 6. Evaluate results
+
+배치 평가 결과 JSON 두 개(피싱/정상)를 받아 분류 지표와 토큰 사용량을 출력합니다.
+
+```bash
+# Docker 환경 (agent/ 디렉터리에서)
+docker run --rm \
+  -v "$(pwd)/results":/work/results \
+  memophish-agent \
+  python evaluate.py \
+    --phish  results/openphish_result.json \
+    --benign results/tranco_result.json
+
+# Conda 로컬 환경
+conda activate memophish
+cd MemoPhishAgent-Reproduction/agent
+python evaluate.py \
+  --phish  results/openphish_result.json \
+  --benign results/tranco_result.json
+```
+
+Sample output:
+
+```text
+==================================================
+  MemoPhishAgent Evaluation Results
+==================================================
+  Dataset       phish=10  benign=10  total=20
+
+  [Confusion Matrix]
+    TP=8  FP=2
+    FN=2  TN=8
+
+  [Classification Metrics]
+    Accuracy  : 0.8000  (80.0%)
+    Precision : 0.8000
+    Recall    : 0.8000
+    F1 Score  : 0.8000
+
+  [Token & LLM Usage]
+    Total tokens      : 88,930  (in=79,800 / out=9,130)
+    Avg tokens / URL  : 4,446.5
+    Total LLM calls   : 43
+    Avg LLM calls/URL : 2.1
+==================================================
+```
+
+샘플 JSON은 `results/samples/`에 있어 바로 테스트해볼 수 있습니다:
+
+```bash
+python evaluate.py \
+  --phish  results/samples/sample_openphish.json \
+  --benign results/samples/sample_tranco.json
+```
+
+---
 
 ## ⚙️ Agent Options
 

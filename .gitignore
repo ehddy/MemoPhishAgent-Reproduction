@@ -17,7 +17,9 @@ agent/*_raw.json
 agent/*_failed_urls.txt
 agent/data*.json
 
-agent/results/
+agent/results/*
+!agent/results/samples
+!agent/results/samples/**
 
 # Work directory outputs
 agent/work/
