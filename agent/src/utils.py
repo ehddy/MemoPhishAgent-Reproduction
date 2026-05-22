@@ -1,4 +1,5 @@
 import json
+import os
 import re
 import time
 from typing import Any, Dict, List, Optional
@@ -7,15 +8,17 @@ from urllib.parse import urlparse
 import boto3
 import tldextract
 from botocore.config import Config
+from dotenv import load_dotenv
 from langchain_aws.chat_models import ChatBedrock
 from serpapi import GoogleSearch
 
+load_dotenv()
+
 # AWS & Model configuration
-AWS_REGION = "us-east-1"
+AWS_REGION = os.environ.get("AWS_REGION", "us-east-1")
 # MODEL_ID = "anthropic.claude-3-sonnet-20240229-v1:0"  # [LEGACY] blocked for new users
 MODEL_ID = "global.anthropic.claude-sonnet-4-6"
-with open("serpAPI_key.txt", "r") as f:
-    API_KEY = f.read().strip()
+API_KEY = os.environ.get("SERPAPI_API_KEY", "")
 
 
 def get_bedrock_client() -> Any:

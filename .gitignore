@@ -17,6 +17,8 @@ agent/*_raw.json
 agent/*_failed_urls.txt
 agent/data*.json
 
+agent/results/
+
 # Work directory outputs
 agent/work/
 
@@ -31,6 +33,7 @@ __pycache__/
 .venv/
 venv/
 env/
+.env
 
 # IDE
 .vscode/

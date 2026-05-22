@@ -30,7 +30,8 @@ Key differences from the original (environment-specific changes):
 | AWS 리전 | `us-east-1` | `us-east-1` (동일) |
 | LangChain 임포트 | `langchain.schema`, `langchain.tools` | `langchain_core.messages`, `langchain_core.tools` (v1.x 호환) |
 | S3 FAISS 룩업 | 활성화 (저자 private 버킷) | 비활성화 (`None`) — 접근 불가 |
-| 설정 파일 | `serpAPI_key.txt`, `test_urls.txt` 직접 커밋 | `.gitignore`로 제외, `.example` 템플릿 제공 |
+| 설정 파일 | `serpAPI_key.txt`, `test_urls.txt` 직접 커밋 | `.gitignore`로 제외, `.env.example` 템플릿 제공 |
+| 오프라인 평가 | 없음 | `test_dataset.py` 추가 — 수집된 데이터셋(html.txt, shot.png)으로 live 접속 없이 배치 평가 |
 
 > The original paper uses `anthropic.claude-3-sonnet-20240229-v1:0` which is a legacy model.
 > This reproduction uses `global.anthropic.claude-sonnet-4-6` (a cross-region inference profile)
@@ -48,11 +49,14 @@ It leverages memory-augmented reasoning via LangGraph ReAct agents backed by AWS
 ```text
 .
 ├── agent/                  # Multi‑modal agent detection framework
-│   ├── src/                # Agent source code
-│   ├── Dockerfile          # Docker image definition
-│   ├── requirements.txt    # Python dependencies
-│   ├── serpAPI_key.txt.example   # SerpAPI key template
-│   └── test_urls.txt.example     # Input URL list template
+│   ├── src/
+│   │   ├── graph.py            # Live URL inference entry point
+│   │   ├── test_dataset.py     # Offline batch evaluation (pre-collected datasets)
+│   │   └── ...
+│   ├── Dockerfile
+│   ├── requirements.txt
+│   ├── .env.example            # Environment variable template (AWS + SerpAPI)
+│   └── test_urls.txt.example   # Input URL list template
 └── README.md
 ```
 
@@ -60,7 +64,7 @@ It leverages memory-augmented reasoning via LangGraph ReAct agents backed by AWS
 
 ### 1. Prerequisites
 
-- Docker (recommended) or Python 3.11+
+- Docker **or** Conda (Python 3.11)
 - AWS credentials with Bedrock access (us-east-1)
 - [SerpAPI](https://serpapi.com/) API key
 
@@ -71,49 +75,123 @@ It leverages memory-augmented reasoning via LangGraph ReAct agents backed by AWS
 git clone https://github.com/ehddy/MemoPhishAgent-Reproduction.git
 cd MemoPhishAgent-Reproduction/agent
 
-# Copy and fill in config files
-cp serpAPI_key.txt.example serpAPI_key.txt
-# Edit serpAPI_key.txt and paste your SerpAPI key
+# Copy and fill in environment variables
+cp .env.example .env
+# Edit .env — fill in AWS credentials and SerpAPI key
 
 cp test_urls.txt.example test_urls.txt
 # Edit test_urls.txt and add URLs to analyze (one per line)
-
-# Configure AWS credentials
-aws configure
 ```
 
-### 3. Run with Docker
+`.env` 파일 내용:
+
+```dotenv
+AWS_ACCESS_KEY_ID=your_access_key_id_here
+AWS_SECRET_ACCESS_KEY=your_secret_access_key_here
+AWS_REGION=us-east-1
+SERPAPI_API_KEY=your_serpapi_key_here
+```
+
+### 3. Run with Docker — Live URL inference
 
 ```bash
 docker build -t memophish-agent .
 
 docker run --rm \
-  -v $(pwd):/work \
-  -e AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID \
-  -e AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY \
-  -e AWS_DEFAULT_REGION=us-east-1 \
+  --env-file .env \
+  -v "$(pwd)/test_urls.txt":/work/test_urls.txt \
+  -v "$(pwd)/results":/work/results \
   memophish-agent \
   python src/graph.py \
     --agent full_agent \
     --input test_urls.txt \
-    --output result.json \
-    --use-memory False \
-    --use-ai-overview False
+    --output results/result.json \
+    --use-memory false \
+    --use-ai-overview false
 ```
 
-### 4. Run locally
+### 4. Run with Docker — Offline dataset evaluation
+
+Pre-collected 데이터셋(html.txt, shot.png, info.txt)을 사용해 live 접속 없이 배치 평가합니다.
+TR-OP 데이터셋처럼 이미 죽은 피싱 사이트 URL을 평가할 때 사용합니다.
 
 ```bash
+docker run --rm \
+  --env-file .env \
+  -v "/path/to/datasets/openphish_5000":/datasets/openphish_5000:ro \
+  -v "$(pwd)/results":/work/results \
+  memophish-agent \
+  python src/test_dataset.py \
+    --dataset-root /datasets/openphish_5000 \
+    --output results/openphish_result.json \
+    --agent full_agent \
+    --use-memory false \
+    --use-ai-overview false
+```
+
+결과 파일:
+
+| 파일 | 내용 |
+| --- | --- |
+| `results/openphish_result.json` | 판별 결과 JSON (`url`, `malicious`, `confidence`, `reason`) |
+| `results/openphish_result.tsv` | TSV: `folder / url / prediction / confidence / reason` |
+| `results/openphish_result_failed_urls.txt` | 처리 실패 URL 목록 |
+
+### 5. Run locally with Conda
+
+#### 5-1. Environment setup (one-time)
+
+```bash
+# Create and activate a Python 3.11 conda environment
+conda create -n memophish python=3.11 -y
+conda activate memophish
+
+# Move into the agent directory
+cd MemoPhishAgent-Reproduction/agent
+
+# Install Python dependencies
 pip install -r requirements.txt
+pip install --upgrade crawl4ai rich
+
+# Install Playwright browser (Chromium only is enough)
 playwright install chromium
 
-cd src
-python graph.py \
+# Copy and fill in credentials
+cp .env.example .env
+# Edit .env — fill in AWS credentials and SerpAPI key
+```
+
+#### 5-2. Live URL inference (local)
+
+```bash
+conda activate memophish
+cd MemoPhishAgent-Reproduction/agent
+
+cp test_urls.txt.example test_urls.txt
+# Edit test_urls.txt — add URLs to analyze (one per line)
+
+mkdir -p results
+python src/graph.py \
   --agent full_agent \
-  --input ../test_urls.txt \
-  --output ../result.json \
-  --use-memory False \
-  --use-ai-overview False
+  --input test_urls.txt \
+  --output results/result.json \
+  --use-memory false \
+  --use-ai-overview false
+```
+
+#### 5-3. Offline dataset evaluation (local)
+
+```bash
+conda activate memophish
+cd MemoPhishAgent-Reproduction/agent
+
+mkdir -p results
+python src/test_dataset.py \
+  --dataset-root /path/to/datasets/openphish_5000 \
+  --output results/openphish_result.json \
+  --agent full_agent \
+  --use-memory false \
+  --use-ai-overview false
 ```
 
 ## ⚙️ Agent Options
@@ -125,6 +203,7 @@ python graph.py \
 | `--use-ai-overview` | `True` | Pre-filter via Google AI Overview (SerpAPI) |
 | `-k` | `5` | Max similar memories to retrieve |
 | `--threshold` | `0.60` | Similarity threshold for memory retrieval |
+| `--sample` | `None` | Number of URLs to evaluate (takes first N after sorting, omit to use all) |
 
 ## 📄 License
 

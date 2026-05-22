@@ -35,8 +35,7 @@ MAX_IMG = 90_000
 MAX_LINKS = 2
 MAX_IMAGES = 2
 
-with open("serpAPI_key.txt", "r") as f:
-    api_key = f.read().strip()
+api_key = os.environ.get("SERPAPI_API_KEY", "")
 
 serpapi = SerpAPIWrapper(serpapi_api_key=api_key)
 

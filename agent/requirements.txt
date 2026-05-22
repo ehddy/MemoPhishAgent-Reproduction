@@ -1,5 +1,6 @@
 playwright
 crawl4ai
+python-dotenv
 serpapi
 pillow
 nest-asyncio
