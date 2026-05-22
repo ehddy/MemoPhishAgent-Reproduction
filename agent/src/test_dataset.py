@@ -464,6 +464,17 @@ if __name__ == "__main__":
             json_result.extend(batch)
             failed_urls.extend(batch_failed)
 
+            # 실패 URL → benign 결과로 즉시 기록 (TSV에서 입력 수 = 결과 수 보장)
+            for failed_url in batch_failed:
+                json_result.append({
+                    "url": failed_url,
+                    "malicious": False,
+                    "confidence": 0,
+                    "reason": "Processing failed.",
+                    "memory_case": "",
+                    "elapsed_sec": elapsed,
+                })
+
             # 루프 중에는 results 배열만 저장 (incremental)
             with open(args.output, "w", encoding="utf-8") as f:
                 json.dump({"results": json_result}, f, indent=2, ensure_ascii=False)
