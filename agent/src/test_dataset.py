@@ -285,7 +285,7 @@ def build_dataset_agent(url_to_folder: Dict, args) -> Any:
 
     tool_list = [
         agent_tools.crawl,
-        agent_tools.extract_targets,
+        # agent_tools.extract_targets,  # 오프라인 평가 시 비활성화: 서브링크 크롤링으로 1 URL → 복수 결과 발생 방지
         agent_tools.check_img,
         agent_tools.check_screenshot,
         agent_tools.serpapi_search,
