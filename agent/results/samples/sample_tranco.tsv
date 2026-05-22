@@ -1,0 +1,11 @@
+folder	url	prediction	confidence	reason
+google+google.com+2024_01_15+001	https://www.google.com/	benign	0	Well-known legitimate search engine; globally trusted domain with consistent branding, valid SSL, and no credential-harvesting indicators.
+amazon+amazon.com+2024_01_15+002	https://www.amazon.com/	benign	0	Legitimate e-commerce platform; official Amazon domain with consistent branding and no phishing indicators.
+wikipedia+wikipedia.org+2024_01_15+003	https://www.wikipedia.org/	benign	0	Non-profit encyclopedia with no login credential harvesting; well-known legitimate domain.
+naver+naver.com+2024_01_15+004	https://www.naver.com/	benign	0	Korea's largest portal site; legitimate domain with consistent branding and no signs of impersonation or credential theft.
+bbc+bbc.com+2024_01_15+005	https://www.bbc.com/	benign	0	Legitimate UK public broadcaster; no login forms targeting credential harvesting, well-established domain.
+github+github.com+2024_01_15+006	https://www.github.com/	benign	0	Legitimate developer platform owned by Microsoft; standard login page with no spoofing indicators.
+linkedin+linkedin.com+2024_01_15+007	https://www.linkedin.com/	benign	1	Legitimate professional networking platform; login page is consistent with official LinkedIn design. No impersonation detected.
+shopify+shopify.com+2024_01_15+008	https://www.shopify.com/	benign	0	Legitimate e-commerce platform; official domain with no indicators of phishing or brand impersonation.
+adobe+adobe.com+2024_01_15+009	https://www.adobe.com/	phish	3	Page presented a login prompt with a credential form. The domain is legitimate Adobe, but the specific landing path contained unusual redirect parameters that resemble phishing kit patterns.
+dropbox+dropbox.com+2024_01_15+010	https://www.dropbox.com/	phish	2	Login page content and form structure superficially resembled a credential-harvesting layout. Domain is legitimate Dropbox; likely a false positive due to similar UI pattern to phishing kits.

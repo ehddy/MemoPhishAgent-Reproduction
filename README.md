@@ -55,8 +55,8 @@ It leverages memory-augmented reasoning via LangGraph ReAct agents backed by AWS
 │   │   └── ...
 │   ├── results/
 │   │   └── samples/
-│   │       ├── sample_openphish.json   # Sample phishing result (10 URLs, ground truth=True)
-│   │       └── sample_tranco.json      # Sample benign result (10 URLs, ground truth=False)
+│   │       ├── sample_openphish.tsv    # Sample phishing result (10 URLs, ground truth=phish)
+│   │       └── sample_tranco.tsv       # Sample benign result (10 URLs, ground truth=benign)
 │   ├── evaluate.py             # Offline evaluation metrics script
 │   ├── Dockerfile
 │   ├── requirements.txt
@@ -239,6 +239,14 @@ Sample output:
     Recall    : 0.8000
     F1 Score  : 0.8000
 ==================================================
+```
+
+샘플 TSV는 `results/samples/`에 있어 바로 테스트해볼 수 있습니다:
+
+```bash
+python evaluate.py \
+  --phish  results/samples/sample_openphish.tsv \
+  --benign results/samples/sample_tranco.tsv
 ```
 
 ---

@@ -1,0 +1,11 @@
+folder	url	prediction	confidence	reason
+netease+asianstonetech.com+2024_01_15+001	http://count.mail.163.com.asianstonetech.com/qiye/	phish	5	Subdomain spoofing of 163.com (NetEase) on an unrelated domain; hosts a credential-harvesting corporate email login form.
+microsoft+roberthood.net+2024_01_15+002	http://roberthood.net/me/young/quak/bizmail.php?email=&lc=1033&id=64855&mkt=en-us&cbcxt=mai	phish	5	Impersonates Microsoft Outlook/Business Mail on an unrelated domain; uses spoofed MS URL parameters and a credential-harvesting login form.
+netease+freewww.info+2024_01_15+003	https://shgcvdjcvdkgcdghc.freewww.info/cd99f9987f25da47c79043eddb83.php	phish	5	Impersonates NetEase Enterprise Email on a randomly-named free subdomain; obfuscated tracking parameters and credential-harvesting fields confirm spear-phishing.
+correos+correos-z.top+2024_01_15+004	https://correos-z.top/	phish	5	Typosquat of Spain's official postal service (correos.es) on abuse-prone .top TLD; matches well-documented Correos smishing/phishing pattern.
+whatsapp+menorcaon.es+2024_01_15+005	https://whatsapp.navegamenorca.menorcaon.es/login	phish	5	Phishing kit impersonating WhatsApp via subdomain abuse on an unrelated Spanish domain; bare Laravel credential-harvesting login form.
+paypal+secure-paypa1.com+2024_01_15+006	https://secure-paypa1.com/signin/	phish	5	Typosquatted PayPal domain ('paypa1' with digit-1 substitution); hosts a fake PayPal login page designed to harvest account credentials.
+apple+apple-id-verify.support+2024_01_15+007	http://apple-id-verify.support/account/login	phish	4	Domain impersonates Apple ID verification service; non-Apple TLD (.support) with a fake Apple login form.
+bankofamerica+bankofamerica-secure.xyz+2024_01_15+008	https://bankofamerica-secure.xyz/online/verify	phish	5	Fake Bank of America verification page on a suspicious .xyz domain; uses official BoA branding to steal banking credentials.
+dhl+dhl-tracking-update.site+2024_01_15+009	https://dhl-tracking-update.site/parcel/confirm	benign	2	Page returned minimal content — could not confirm phishing elements. Domain is suspicious but insufficient evidence to classify as malicious.
+facebook+faceb00k-login.com+2024_01_15+010	https://faceb00k-login.com/checkpoint/	benign	1	Page returned a 404 error. Site appears to be inactive; no content available for analysis.
