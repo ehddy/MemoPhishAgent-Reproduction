@@ -99,6 +99,8 @@ class ReactNodes:
 
         # disable screenshot for clarity
         if response.tool_calls and response.tool_calls[0]["name"] == "crawl_content":
+            if "args" not in response.tool_calls[0]:
+                response.tool_calls[0]["args"] = {}
             response.tool_calls[0]["args"]["screenshot"] = False
 
         # out of steps
@@ -223,6 +225,14 @@ class ReactNodes:
             except botocore.exceptions.ClientError as e:
                 error_code = e.response["Error"]["Code"]
                 error_message = e.response["Error"]["Message"]
+                
+                # If it's an image processing error, continue without adding to failed_urls
+                if "Could not process image" in str(e):
+                    logging.warning(f"⚠️ Image processing failed for {url}, continuing with text-only analysis: {e}")
+                    # Continue processing - don't add to failed_urls
+                    continue
+                
+                # For other errors, add to failed_urls
                 failed_urls.append(url)
                 with open(
                     f"{self.args.output.split('.')[0]}_failed_urls.txt", "w"
