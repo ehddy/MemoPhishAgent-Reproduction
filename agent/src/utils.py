@@ -282,8 +282,9 @@ def ai_overview_preprocess(url, llm):
 
 
 # 새로 추가
-def get_bedrock_image_type(image_bytes: bytes) -> str:
-    """이미지 바이너리를 체크하여 Bedrock이 지원하는 MIME 타입을 반환합니다."""
+def get_bedrock_image_type(image_bytes: bytes) -> str | None:
+    """이미지 바이너리를 체크하여 Bedrock이 지원하는 MIME 타입을 반환합니다.
+    SVG 등 지원하지 않는 포맷이면 None을 반환합니다."""
     if image_bytes.startswith(b'\x89PNG\r\n\x1a\n'):
         return "image/png"
     elif image_bytes.startswith(b'\xff\xd8'):
@@ -292,4 +293,8 @@ def get_bedrock_image_type(image_bytes: bytes) -> str:
         return "image/gif"
     elif image_bytes.startswith(b'RIFF') and image_bytes[8:12] == b'WEBP':
         return "image/webp"
-    return "image/jpeg" # 기본값
+    # SVG / XML / HTML 등 Bedrock 미지원 포맷
+    stripped = image_bytes.lstrip()
+    if stripped.startswith(b'<'):
+        return None
+    return None  # 알 수 없는 포맷도 None으로 처리

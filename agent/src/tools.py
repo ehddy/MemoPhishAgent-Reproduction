@@ -67,6 +67,48 @@ serpapi_tool = Tool.from_function(
 )
 
 
+_gcse_api_key = os.environ.get("GOOGLE_CSE_API_KEY", "")
+_gcse_cx      = os.environ.get("GOOGLE_CSE_ID", "")
+
+def google_custom_search_with_fallback(query: str) -> str:
+    """Google Custom Search API wrapper that returns the same plain-text format as serpapi_search."""
+    import requests
+
+    logging.info(f"🔎 [Google CSE Tool] Searching: {query}")
+    if not _gcse_api_key or not _gcse_cx:
+        return "Search failed with error: GOOGLE_CSE_API_KEY or GOOGLE_CSE_ID not set."
+    try:
+        resp = requests.get(
+            "https://www.googleapis.com/customsearch/v1",
+            params={"key": _gcse_api_key, "cx": _gcse_cx, "q": query, "num": 10},
+            timeout=10,
+        )
+        resp.raise_for_status()
+        items = resp.json().get("items", [])
+        if not items:
+            logging.warning(f"⚠️ [Google CSE Tool] No results found")
+            return f"No search results found for query: {query}. This might indicate an obscure or recently created domain."
+        result = "\n\n".join(
+            f"{item.get('title', '')}\n{item.get('snippet', '')}"
+            for item in items
+        )
+        logging.info(f"✅ [Google CSE Tool] Found {len(result)} chars of results")
+        return result
+    except Exception as e:
+        logging.error(f"❌ [Google CSE Tool] Unexpected error: {e}")
+        return f"Search failed with error: {str(e)}"
+
+google_custom_search_tool = Tool.from_function(
+    func=google_custom_search_with_fallback,
+    name="google_custom_search",
+    description=(
+        "Use this to look up facts on the web. "
+        "Input: a search query (string). "
+        "Output: the combined text of the top search results, or a message if no results found."
+    ),
+)
+
+
 class CrawlContentInput(BaseModel):
     """
     Input schema for the `crawl_content` tool.
@@ -470,6 +512,10 @@ class CheckImageTool(BaseTool):
 
         # 실제 바이너리 데이터를 분석하여 타입 결정
         img_type = get_bedrock_image_type(img_bytes)
+        if img_type is None:
+            logging.warning(f"check_img unsupported format ({img_url}), skipping Bedrock call")
+            return {"image_url": img_url, "description": "Unsupported image format (e.g. SVG); could not inspect."}
+
         image_b64 = base64.b64encode(img_bytes).decode("utf-8")
 
         messages = [
@@ -481,15 +527,19 @@ class CheckImageTool(BaseTool):
                         "type": "image",
                         "source": {
                             "type": "base64",
-                            "media_type": img_type, # 동적으로 감지된 타입 사용
+                            "media_type": img_type,
                             "data": image_b64,
                         },
                     },
                 ],
             }
         ]
-        resp_llm = await self.chat.ainvoke(messages)
-        return {"image_url": img_url, "description": resp_llm.content}
+        try:
+            resp_llm = await self.chat.ainvoke(messages)
+            return {"image_url": img_url, "description": resp_llm.content}
+        except Exception as e:
+            logging.warning(f"check_img Bedrock call failed ({img_url}): {e}")
+            return {"image_url": img_url, "description": f"Image inspection failed: {e}"}
     
 
     def _run(self, *args, **kwargs):
@@ -790,6 +840,7 @@ class AgentTools:
         self.check_img = CheckImageTool(llm)
         self.judge_img = make_judge_image(llm)
         self.serpapi_search = serpapi_tool
+        self.google_custom_search = google_custom_search_tool
         # historicals - [DISABLED] requires private S3 bucket "guardians-cipher" (authors' internal bucket)
         # self.domain_lookup = build_lookbook_retriever_from_s3(
         #     "guardians-cipher",

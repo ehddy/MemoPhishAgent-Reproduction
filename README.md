@@ -71,7 +71,8 @@ It leverages memory-augmented reasoning via LangGraph ReAct agents backed by AWS
 
 - Docker **or** Conda (Python 3.11)
 - AWS credentials with Bedrock access (us-east-1)
-- [SerpAPI](https://serpapi.com/) API key
+- [SerpAPI](https://serpapi.com/) API key (live inference용)
+- [Google Custom Search API](https://developers.google.com/custom-search/v1/overview) key + Search Engine ID (데이터셋 평가용)
 
 ### 2. Setup
 
@@ -94,7 +95,9 @@ cp test_urls.txt.example test_urls.txt
 AWS_ACCESS_KEY_ID=your_access_key_id_here
 AWS_SECRET_ACCESS_KEY=your_secret_access_key_here
 AWS_REGION=us-east-1
-SERPAPI_API_KEY=your_serpapi_key_here
+SERPAPI_API_KEY=your_serpapi_key_here        # live inference (graph.py)
+GOOGLE_CSE_API_KEY=your_google_cse_api_key_here  # dataset eval (test_dataset.py)
+GOOGLE_CSE_ID=your_google_cse_id_here            # dataset eval (test_dataset.py)
 ```
 
 ### 3. Run with Docker — Live URL inference

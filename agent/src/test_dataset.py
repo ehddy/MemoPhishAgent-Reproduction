@@ -288,7 +288,7 @@ def build_dataset_agent(url_to_folder: Dict, args) -> Any:
         # agent_tools.extract_targets,  # 오프라인 평가 시 비활성화: 서브링크 크롤링으로 1 URL → 복수 결과 발생 방지
         agent_tools.check_img,
         agent_tools.check_screenshot,
-        agent_tools.serpapi_search,
+        agent_tools.google_custom_search,
     ]
 
     config = RunnableConfig(callbacks=callbacks, recursion_limit=80)
@@ -465,9 +465,15 @@ if __name__ == "__main__":
             batch = result.get("json_result", [])
             batch_failed = result.get("failed_urls", [])
 
-            for v in batch:
-                v["elapsed_sec"] = elapsed
-            json_result.extend(batch)
+            # 입력 URL과 매칭되는 verdict만 취하고, 없으면 첫 번째를 fallback으로 사용
+            matched = [v for v in batch if v.get("url") == url]
+            if not matched and batch:
+                logging.warning(f"[Filter] No verdict matched input URL '{url}', using first as fallback")
+                matched = batch[:1]
+            if matched:
+                matched[0]["url"] = url  # 입력 URL로 정규화
+                matched[0]["elapsed_sec"] = elapsed
+                json_result.append(matched[0])
             failed_urls.extend(batch_failed)
 
             # 실패 URL → benign 결과로 즉시 기록 (TSV에서 입력 수 = 결과 수 보장)
