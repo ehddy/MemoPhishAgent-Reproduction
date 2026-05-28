@@ -16,8 +16,7 @@ load_dotenv()
 
 # AWS & Model configuration
 AWS_REGION = os.environ.get("AWS_REGION", "us-east-1")
-# MODEL_ID = "anthropic.claude-3-sonnet-20240229-v1:0"  # [LEGACY] blocked for new users
-MODEL_ID = "global.anthropic.claude-sonnet-4-6"
+MODEL_ID = os.environ.get("BEDROCK_MODEL_ID", "global.anthropic.claude-sonnet-4-6")
 API_KEY = os.environ.get("SERPAPI_API_KEY", "")
 
 

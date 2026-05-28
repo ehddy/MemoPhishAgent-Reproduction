@@ -2,9 +2,13 @@
 MemoPhishAgent 평가 스크립트
 
 Usage:
+    # 단일 클래스 모드 (기존 방식)
     python evaluate.py \
         --phish  results/openphish_result.tsv \
         --benign results/tranco_result.tsv
+
+    # 혼합 모드 (test_dataset.py --phish-root + --benign-root 결과)
+    python evaluate.py --mixed results/mixed_result.tsv
 
 중복 제거 정책:
     - folder == "unknown" 행은 제외 (에이전트가 자체적으로 크롤한 서브 URL)
@@ -20,6 +24,7 @@ import csv
 
 
 def load_tsv(path: str, ground_truth: bool):
+    """단일 클래스 TSV 로드 (ground_truth 외부 지정)."""
     seen_folders = set()
     records = []
     with open(path, encoding="utf-8", newline="") as f:
@@ -33,6 +38,29 @@ def load_tsv(path: str, ground_truth: bool):
             seen_folders.add(folder)
             pred = row.get("prediction", "").strip().lower() == "phish"
             records.append({"gt": ground_truth, "pred": pred})
+    return records
+
+
+def load_mixed_tsv(path: str):
+    """혼합 모드 TSV 로드 (ground_truth 컬럼 포함).
+
+    test_dataset.py --phish-root + --benign-root 출력 형식:
+        folder  url  ground_truth  prediction  confidence  reason
+    """
+    seen_folders = set()
+    records = []
+    with open(path, encoding="utf-8", newline="") as f:
+        reader = csv.DictReader(f, delimiter="\t")
+        for row in reader:
+            folder = row.get("folder", "").strip()
+            if not folder or folder == "unknown":
+                continue
+            if folder in seen_folders:
+                continue
+            seen_folders.add(folder)
+            gt   = row.get("ground_truth", "").strip().lower() == "phish"
+            pred = row.get("prediction",   "").strip().lower() == "phish"
+            records.append({"gt": gt, "pred": pred})
     return records
 
 
@@ -54,23 +82,12 @@ def compute_metrics(records):
                 recall=recall, f1=f1)
 
 
-def main():
-    parser = argparse.ArgumentParser(description="MemoPhishAgent 결과 평가")
-    parser.add_argument("--phish",  required=True, help="피싱 데이터셋 결과 TSV (ground truth=phish)")
-    parser.add_argument("--benign", required=True, help="정상 데이터셋 결과 TSV (ground truth=benign)")
-    args = parser.parse_args()
-
-    phish_records  = load_tsv(args.phish,  ground_truth=True)
-    benign_records = load_tsv(args.benign, ground_truth=False)
-
-    all_records = phish_records + benign_records
-    m = compute_metrics(all_records)
-    total_urls = len(all_records)
-
+def print_results(m, phish_count, benign_count):
+    total_urls = phish_count + benign_count
     print("=" * 50)
     print("  MemoPhishAgent Evaluation Results")
     print("=" * 50)
-    print(f"  Dataset  phish={len(phish_records)}  benign={len(benign_records)}  total={total_urls}")
+    print(f"  Dataset  phish={phish_count}  benign={benign_count}  total={total_urls}")
     print()
     print("  [Confusion Matrix]")
     print(f"    TP={m['TP']}  FP={m['FP']}")
@@ -82,6 +99,33 @@ def main():
     print(f"    Recall    : {m['recall']:.4f}")
     print(f"    F1 Score  : {m['f1']:.4f}")
     print("=" * 50)
+
+
+def main():
+    parser = argparse.ArgumentParser(description="MemoPhishAgent 결과 평가")
+    parser.add_argument("--phish",  default=None, help="피싱 데이터셋 결과 TSV (ground truth=phish)")
+    parser.add_argument("--benign", default=None, help="정상 데이터셋 결과 TSV (ground truth=benign)")
+    parser.add_argument(
+        "--mixed",
+        default=None,
+        help="혼합 모드 결과 TSV (ground_truth 컬럼 포함, test_dataset.py --phish-root + --benign-root 출력)",
+    )
+    args = parser.parse_args()
+
+    if args.mixed:
+        records = load_mixed_tsv(args.mixed)
+        phish_count  = sum(1 for r in records if r["gt"])
+        benign_count = sum(1 for r in records if not r["gt"])
+        m = compute_metrics(records)
+        print_results(m, phish_count, benign_count)
+    elif args.phish and args.benign:
+        phish_records  = load_tsv(args.phish,  ground_truth=True)
+        benign_records = load_tsv(args.benign, ground_truth=False)
+        all_records = phish_records + benign_records
+        m = compute_metrics(all_records)
+        print_results(m, len(phish_records), len(benign_records))
+    else:
+        parser.error("--mixed 또는 (--phish + --benign) 중 하나를 지정하세요.")
 
 
 if __name__ == "__main__":

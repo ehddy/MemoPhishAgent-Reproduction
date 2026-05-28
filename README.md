@@ -26,7 +26,7 @@ Key differences from the original (environment-specific changes):
 | 항목 | 원본 코드 | 이 재현본 |
 | --- | --- | --- |
 | LLM 클래스 | `ChatBedrock` | `ChatBedrock` (동일) |
-| 모델 ID | `anthropic.claude-3-sonnet-20240229-v1:0` | `global.anthropic.claude-sonnet-4-6` (최신 모델로 교체) |
+| 모델 ID | `anthropic.claude-3-sonnet-20240229-v1:0` | `global.anthropic.claude-sonnet-4-6` 기본값, `.env`의 `BEDROCK_MODEL_ID`로 변경 가능 |
 | AWS 리전 | `us-east-1` | `us-east-1` (동일) |
 | LangChain 임포트 | `langchain.schema`, `langchain.tools` | `langchain_core.messages`, `langchain_core.tools` (v1.x 호환) |
 | S3 FAISS 룩업 | 활성화 (저자 private 버킷) | 비활성화 (`None`) — 접근 불가 |
@@ -95,10 +95,13 @@ cp test_urls.txt.example test_urls.txt
 AWS_ACCESS_KEY_ID=your_access_key_id_here
 AWS_SECRET_ACCESS_KEY=your_secret_access_key_here
 AWS_REGION=us-east-1
+BEDROCK_MODEL_ID=global.anthropic.claude-sonnet-4-6  # 생략 시 이 값이 기본값
 SERPAPI_API_KEY=your_serpapi_key_here        # live inference (graph.py)
-GOOGLE_CSE_API_KEY=your_google_cse_api_key_here  # dataset eval (test_dataset.py)
-GOOGLE_CSE_ID=your_google_cse_id_here            # dataset eval (test_dataset.py)
+GOOGLE_CSE_API_KEY=key1,key2,key3  # 단일 키도 가능; 복수 시 429 Rate Limit 초과 시 자동 전환
+GOOGLE_CSE_ID=your_google_cse_id_here  # CSE ID는 모든 키가 공유 (1개만 설정)
 ```
+
+사용 가능한 모델 ID는 AWS 콘솔 **Bedrock → Model catalog / Cross-region inference** 에서 확인하세요.
 
 ### 3. Run with Docker — Live URL inference
 
@@ -123,6 +126,31 @@ docker run --rm \
 Pre-collected 데이터셋(html.txt, shot.png, info.txt)을 사용해 live 접속 없이 배치 평가합니다.
 TR-OP 데이터셋처럼 이미 죽은 피싱 사이트 URL을 평가할 때 사용합니다.
 
+**혼합 모드 (권장)** — 피싱/정상 URL을 동일한 수로 샘플링해 섞어서 실행합니다.
+메모리가 특정 클래스에 편향되지 않아 논문의 평가 설정에 가장 가깝습니다.
+
+```bash
+docker run --rm \
+  --env-file .env \
+  -v "/path/to/datasets/openphish_5000":/datasets/openphish_5000:ro \
+  -v "/path/to/datasets/tranco_5000":/datasets/tranco_5000:ro \
+  -v "$(pwd)/results":/work/results \
+  memophish-agent \
+  python src/test_dataset.py \
+    --phish-root  /datasets/openphish_5000 \
+    --benign-root /datasets/tranco_5000 \
+    --sample 200 \
+    --seed 42 \
+    --output results/mixed_result.json \
+    --agent full_agent \
+    --use-memory true \
+    --use-ai-overview false
+```
+
+`--sample N`은 피싱 N/2 + 정상 N/2개를 샘플링합니다 (항상 동일 비율).
+
+**단일 클래스 모드 (레거시)** — 피싱 또는 정상 한 종류씩 따로 실행합니다.
+
 ```bash
 docker run --rm \
   --env-file .env \
@@ -141,9 +169,9 @@ docker run --rm \
 
 | 파일 | 내용 |
 | --- | --- |
-| `results/openphish_result.json` | 판별 결과 JSON (`url`, `malicious`, `confidence`, `reason`) |
-| `results/openphish_result.tsv` | TSV: `folder / url / prediction / confidence / reason` |
-| `results/openphish_result_failed_urls.txt` | 처리 실패 URL 목록 |
+| `results/mixed_result.json` | 판별 결과 JSON (`url`, `ground_truth`, `malicious`, `confidence`, `reason`) |
+| `results/mixed_result.tsv` | TSV: `folder / url / ground_truth / prediction / confidence / reason` |
+| `results/mixed_result_failed_urls.txt` | 처리 실패 URL 목록 (있을 경우) |
 
 ### 5. Run locally with Conda
 
@@ -189,11 +217,27 @@ python src/graph.py \
 
 #### 5-3. Offline dataset evaluation (local)
 
+**혼합 모드 (권장):**
+
 ```bash
 conda activate memophish
 cd MemoPhishAgent-Reproduction/agent
 
 mkdir -p results
+python src/test_dataset.py \
+  --phish-root  /path/to/datasets/openphish_5000 \
+  --benign-root /path/to/datasets/tranco_5000 \
+  --sample 200 \
+  --seed 42 \
+  --output results/mixed_result.json \
+  --agent full_agent \
+  --use-memory true \
+  --use-ai-overview false
+```
+
+**단일 클래스 모드 (레거시):**
+
+```bash
 python src/test_dataset.py \
   --dataset-root /path/to/datasets/openphish_5000 \
   --output results/openphish_result.json \
@@ -204,15 +248,22 @@ python src/test_dataset.py \
 
 ### 6. Evaluate results
 
-배치 평가 결과 TSV 두 개(피싱/정상)를 받아 분류 지표를 출력합니다.
+배치 평가 결과 TSV를 받아 분류 지표를 출력합니다.
 `folder == "unknown"` 행(에이전트가 자체 크롤한 서브 URL)과 동일 폴더 중복 행은 자동으로 제거합니다.
-
 실패한 URL도 `benign`으로 TSV에 자동 기록되므로 항상 입력 수 = 결과 수가 보장됩니다.
+
+**혼합 모드 결과 평가** (`--phish-root` + `--benign-root` 실행 결과):
+
+```bash
+python evaluate.py --mixed results/mixed_result_<timestamp>.tsv
+```
+
+**단일 클래스 모드 결과 평가** (피싱/정상 각각 실행 후):
 
 ```bash
 python evaluate.py \
-  --phish  results/openphish_result.tsv \
-  --benign results/tranco_result.tsv
+  --phish  results/openphish_result_<timestamp>.tsv \
+  --benign results/tranco_result_<timestamp>.tsv
 ```
 
 Sample output:
@@ -235,7 +286,7 @@ Sample output:
 ==================================================
 ```
 
-샘플 TSV는 `results/samples/`에 있어 바로 테스트해볼 수 있습니다:
+샘플 TSV(단일 클래스 형식)는 `results/samples/`에 있어 바로 테스트해볼 수 있습니다:
 
 ```bash
 python evaluate.py \
@@ -247,14 +298,24 @@ python evaluate.py \
 
 ## ⚙️ Agent Options
 
+**`test_dataset.py` 데이터셋 경로 (둘 중 하나 선택):**
+
+| Option | Description |
+| --- | --- |
+| `--dataset-root` | 단일 클래스 모드: 평가할 데이터셋 폴더 |
+| `--phish-root` + `--benign-root` | 혼합 모드: 피싱/정상 각각의 데이터셋 폴더 (동시 지정 필수) |
+
+**공통 옵션:**
+
 | Option | Default | Description |
 | --- | --- | --- |
 | `--agent` | — | `determine` / `noimg_agent` / `full_agent` |
-| `--use-memory` | `True` | Enable memory-augmented reasoning |
-| `--use-ai-overview` | `True` | Pre-filter via Google AI Overview (SerpAPI) |
+| `--use-memory` | `false` | Enable memory-augmented reasoning |
+| `--use-ai-overview` | `false` | Pre-filter via Google AI Overview (SerpAPI) |
 | `-k` | `5` | Max similar memories to retrieve |
 | `--threshold` | `0.60` | Similarity threshold for memory retrieval |
-| `--sample` | `None` | Number of URLs to evaluate (takes first N after sorting, omit to use all) |
+| `--sample` | all | 처리할 URL 수 (혼합: 피싱 N/2 + 정상 N/2; 단일: 앞 N개) |
+| `--seed` | `42` | 혼합 모드 stratified sampling & shuffle 시드 |
 
 ## 📄 License
 

@@ -19,12 +19,13 @@ import base64
 import json
 import logging
 import os
+import random
 import re
 import time
 from datetime import datetime
 from io import BytesIO
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 from crawl4ai import AsyncWebCrawler, CrawlerRunConfig
 
@@ -358,15 +359,20 @@ def build_dataset_agent(url_to_folder: Dict, args) -> Any:
 # ---------------------------------------------------------------------------
 
 def save_tsv(results: List[Dict], url_to_folder: Dict, tsv_path: str,
-             input_urls: set = None):
+             input_urls: set = None, url_labels: Optional[Dict[str, str]] = None):
     """판별 결과를 TSV 포맷으로 저장한다.
 
     input_urls가 제공되면 해당 URL만 valid 폴더로 기록하고,
     입력 외 URL(서브링크 등)은 folder="unknown"으로 처리한다.
+    url_labels가 제공되면 ground_truth 컬럼을 추가한다 (혼합 모드).
     """
+    has_labels = bool(url_labels)
     os.makedirs(os.path.dirname(tsv_path) or ".", exist_ok=True)
     with open(tsv_path, "w", encoding="utf-8") as f:
-        f.write("folder\turl\tprediction\tconfidence\treason\n")
+        if has_labels:
+            f.write("folder\turl\tground_truth\tprediction\tconfidence\treason\n")
+        else:
+            f.write("folder\turl\tprediction\tconfidence\treason\n")
         for r in results:
             url = r.get("url", "")
             in_input = (input_urls is None) or (url in input_urls)
@@ -375,7 +381,11 @@ def save_tsv(results: List[Dict], url_to_folder: Dict, tsv_path: str,
             prediction  = "phish" if r.get("malicious") else "benign"
             confidence  = r.get("confidence", "")
             reason      = r.get("reason", "").replace("\n", " ").replace("\t", " ")
-            f.write(f"{folder_name}\t{url}\t{prediction}\t{confidence}\t{reason}\n")
+            if has_labels:
+                gt = url_labels.get(url, "")
+                f.write(f"{folder_name}\t{url}\t{gt}\t{prediction}\t{confidence}\t{reason}\n")
+            else:
+                f.write(f"{folder_name}\t{url}\t{prediction}\t{confidence}\t{reason}\n")
 
 
 # ---------------------------------------------------------------------------
@@ -384,13 +394,31 @@ def save_tsv(results: List[Dict], url_to_folder: Dict, tsv_path: str,
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        description="로컬 데이터셋으로 MemoPhishAgent를 배치 평가한다."
+        description=(
+            "로컬 데이터셋으로 MemoPhishAgent를 배치 평가한다.\n\n"
+            "단일 클래스 모드: --dataset-root 하나만 지정\n"
+            "혼합 모드      : --phish-root + --benign-root 동시 지정 (메모리 공정성 평가 권장)"
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
     )
+
+    # --- 데이터셋 경로 (단일 또는 혼합) ---
     parser.add_argument(
         "--dataset-root",
-        required=True,
-        help="평가할 데이터셋 폴더 (하위에 URL별 폴더가 있어야 함)",
+        default=None,
+        help="[단일 클래스 모드] 평가할 데이터셋 폴더",
     )
+    parser.add_argument(
+        "--phish-root",
+        default=None,
+        help="[혼합 모드] 피싱 데이터셋 폴더",
+    )
+    parser.add_argument(
+        "--benign-root",
+        default=None,
+        help="[혼합 모드] 정상 데이터셋 폴더",
+    )
+
     parser.add_argument(
         "--agent",
         choices=["determine", "noimg_agent", "full_agent"],
@@ -421,9 +449,27 @@ if __name__ == "__main__":
         "--sample",
         default=None,
         type=int,
-        help="처리할 URL 수 (정렬 후 앞에서 N개, 생략 시 전체 사용)",
+        help=(
+            "처리할 URL 수.\n"
+            "단일 클래스 모드: 정렬 후 앞 N개.\n"
+            "혼합 모드: 피싱 N//2 + 정상 N//2 (짝수 권장, 생략 시 양쪽 최솟값 사용)."
+        ),
+    )
+    parser.add_argument(
+        "--seed",
+        default=42,
+        type=int,
+        help="혼합 모드 stratified sampling 및 셔플에 사용할 랜덤 시드 (기본값: 42)",
     )
     args = parser.parse_args()
+
+    # 인수 검증
+    mixed_mode = bool(args.phish_root and args.benign_root)
+    single_mode = bool(args.dataset_root)
+    if not mixed_mode and not single_mode:
+        parser.error("--dataset-root 또는 (--phish-root + --benign-root) 중 하나를 지정하세요.")
+    if mixed_mode and single_mode:
+        parser.error("--dataset-root와 --phish-root/--benign-root를 동시에 사용할 수 없습니다.")
 
     # 출력 파일명에 타임스탬프 삽입 (예: result.json → result_20260522_040648.json)
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -432,18 +478,53 @@ if __name__ == "__main__":
     output_base = args.output.rsplit(".", 1)[0]
     os.makedirs(os.path.dirname(args.output) or ".", exist_ok=True)
 
-    # 1. URL → 폴더 매핑 구축
-    url_to_folder = build_url_folder_map(args.dataset_root)
-    if not url_to_folder:
-        logging.error("처리할 URL이 없습니다. --dataset-root 경로를 확인하세요.")
-        raise SystemExit(1)
+    # 1. URL → 폴더 매핑 구축 + 혼합 모드 stratified sampling
+    url_labels: Dict[str, str] = {}  # url → "phish" | "benign" (단일 모드에서는 빈 dict)
 
-    urls = list(url_to_folder.keys())
+    if mixed_mode:
+        phish_map  = build_url_folder_map(args.phish_root)
+        benign_map = build_url_folder_map(args.benign_root)
 
-    # 앞에서 N개 자르기 (--sample 지정 시)
-    if args.sample and args.sample < len(urls):
-        urls = urls[:args.sample]
-        logging.info(f"샘플링: 정렬 후 앞 {args.sample}/{len(url_to_folder)}개 선택")
+        if not phish_map or not benign_map:
+            logging.error("피싱 또는 정상 데이터셋이 비어 있습니다. 경로를 확인하세요.")
+            raise SystemExit(1)
+
+        # 피싱/정상 각각 동일한 수 샘플링
+        n_each = (args.sample // 2) if args.sample else min(len(phish_map), len(benign_map))
+        if n_each > len(phish_map):
+            logging.warning(f"피싱 데이터셋({len(phish_map)}개) < 요청({n_each}개), 전체 사용")
+            n_each = len(phish_map)
+        if n_each > len(benign_map):
+            logging.warning(f"정상 데이터셋({len(benign_map)}개) < 요청({n_each}개), 전체 사용")
+            n_each = len(benign_map)
+
+        rng = random.Random(args.seed)
+        phish_urls  = rng.sample(list(phish_map.keys()),  n_each)
+        benign_urls = rng.sample(list(benign_map.keys()), n_each)
+
+        url_to_folder = {**{u: phish_map[u] for u in phish_urls},
+                         **{u: benign_map[u] for u in benign_urls}}
+        url_labels    = {u: "phish"  for u in phish_urls}
+        url_labels.update({u: "benign" for u in benign_urls})
+
+        urls = phish_urls + benign_urls
+        rng.shuffle(urls)
+
+        logging.info(
+            f"[혼합 모드] stratified sampling (seed={args.seed}): "
+            f"phish={n_each}, benign={n_each}, total={len(urls)}"
+        )
+    else:
+        url_to_folder = build_url_folder_map(args.dataset_root)
+        if not url_to_folder:
+            logging.error("처리할 URL이 없습니다. --dataset-root 경로를 확인하세요.")
+            raise SystemExit(1)
+
+        urls = list(url_to_folder.keys())
+
+        if args.sample and args.sample < len(urls):
+            urls = urls[:args.sample]
+            logging.info(f"샘플링: 정렬 후 앞 {args.sample}/{len(url_to_folder)}개 선택")
 
     logging.info(f"총 {len(urls)}개 URL 처리 시작 (agent={args.agent})")
     logging.info(f"결과 저장 경로: {args.output}")
@@ -472,20 +553,25 @@ if __name__ == "__main__":
                 matched = batch[:1]
             if matched:
                 matched[0]["url"] = url  # 입력 URL로 정규화
+                if url_labels:
+                    matched[0]["ground_truth"] = url_labels.get(url, "")
                 matched[0]["elapsed_sec"] = elapsed
                 json_result.append(matched[0])
             failed_urls.extend(batch_failed)
 
             # 실패 URL → benign 결과로 즉시 기록 (TSV에서 입력 수 = 결과 수 보장)
             for failed_url in batch_failed:
-                json_result.append({
+                entry = {
                     "url": failed_url,
                     "malicious": False,
                     "confidence": 0,
                     "reason": "Processing failed.",
                     "memory_case": "",
                     "elapsed_sec": elapsed,
-                })
+                }
+                if url_labels:
+                    entry["ground_truth"] = url_labels.get(failed_url, "")
+                json_result.append(entry)
 
             # 루프 중에는 results 배열만 저장 (incremental)
             with open(args.output, "w", encoding="utf-8") as f:
@@ -512,6 +598,9 @@ if __name__ == "__main__":
                     "avg_elapsed_sec": avg_elapsed,
                     "token_usage": token_callback.usage_metadata,
                     "llm_calls": counter.count,
+                    **({"n_phish": sum(1 for u in urls if url_labels.get(u) == "phish"),
+                        "n_benign": sum(1 for u in urls if url_labels.get(u) == "benign"),
+                        "seed": args.seed} if url_labels else {}),
                 },
             },
             f,
@@ -522,7 +611,8 @@ if __name__ == "__main__":
 
     # 4. TSV 저장
     tsv_path = f"{output_base}.tsv"
-    save_tsv(json_result, url_to_folder, tsv_path, input_urls=set(urls))
+    save_tsv(json_result, url_to_folder, tsv_path,
+             input_urls=set(urls), url_labels=url_labels if url_labels else None)
     logging.info(f"TSV 결과 저장: {tsv_path}")
 
     # 5. 실패 URL 저장

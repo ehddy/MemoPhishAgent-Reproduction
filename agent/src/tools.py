@@ -67,36 +67,71 @@ serpapi_tool = Tool.from_function(
 )
 
 
-_gcse_api_key = os.environ.get("GOOGLE_CSE_API_KEY", "")
-_gcse_cx      = os.environ.get("GOOGLE_CSE_ID", "")
+_gcse_api_keys: list = [
+    k.strip()
+    for k in os.environ.get("GOOGLE_CSE_API_KEY", "").split(",")
+    if k.strip()
+]
+_gcse_cx              = os.environ.get("GOOGLE_CSE_ID", "")
+_gcse_current_key_idx = 0  # 세션 내에서 429 발생 시 증가, 절대 감소하지 않음
+
 
 def google_custom_search_with_fallback(query: str) -> str:
-    """Google Custom Search API wrapper that returns the same plain-text format as serpapi_search."""
+    """Google Custom Search API wrapper that returns the same plain-text format as serpapi_search.
+
+    GOOGLE_CSE_API_KEY에 콤마로 구분된 복수의 키를 지정할 수 있다.
+    현재 키가 429(Rate Limit)를 반환하면 다음 키로 영구 전환하여 재시도한다.
+    """
+    global _gcse_current_key_idx
     import requests
 
     logging.info(f"🔎 [Google CSE Tool] Searching: {query}")
-    if not _gcse_api_key or not _gcse_cx:
+    if not _gcse_api_keys or not _gcse_cx:
         return "Search failed with error: GOOGLE_CSE_API_KEY or GOOGLE_CSE_ID not set."
-    try:
-        resp = requests.get(
-            "https://www.googleapis.com/customsearch/v1",
-            params={"key": _gcse_api_key, "cx": _gcse_cx, "q": query, "num": 10},
-            timeout=10,
-        )
-        resp.raise_for_status()
-        items = resp.json().get("items", [])
-        if not items:
-            logging.warning(f"⚠️ [Google CSE Tool] No results found")
-            return f"No search results found for query: {query}. This might indicate an obscure or recently created domain."
-        result = "\n\n".join(
-            f"{item.get('title', '')}\n{item.get('snippet', '')}"
-            for item in items
-        )
-        logging.info(f"✅ [Google CSE Tool] Found {len(result)} chars of results")
-        return result
-    except Exception as e:
-        logging.error(f"❌ [Google CSE Tool] Unexpected error: {e}")
-        return f"Search failed with error: {str(e)}"
+
+    while _gcse_current_key_idx < len(_gcse_api_keys):
+        api_key = _gcse_api_keys[_gcse_current_key_idx]
+        try:
+            resp = requests.get(
+                "https://www.googleapis.com/customsearch/v1",
+                params={"key": api_key, "cx": _gcse_cx, "q": query, "num": 10},
+                timeout=10,
+            )
+            resp.raise_for_status()
+            items = resp.json().get("items", [])
+            if not items:
+                logging.warning("⚠️ [Google CSE Tool] No results found")
+                return (
+                    f"No search results found for query: {query}. "
+                    "This might indicate an obscure or recently created domain."
+                )
+            result = "\n\n".join(
+                f"{item.get('title', '')}\n{item.get('snippet', '')}"
+                for item in items
+            )
+            logging.info(f"✅ [Google CSE Tool] Found {len(result)} chars of results")
+            return result
+        except requests.exceptions.HTTPError as e:
+            if e.response.status_code == 429:
+                logging.warning(
+                    f"⚠️ [Google CSE Tool] Rate limit exceeded (429) for key "
+                    f"{_gcse_current_key_idx + 1}/{len(_gcse_api_keys)}"
+                )
+                _gcse_current_key_idx += 1
+                if _gcse_current_key_idx < len(_gcse_api_keys):
+                    logging.info(
+                        f"🔄 [Google CSE Tool] Switching to key "
+                        f"{_gcse_current_key_idx + 1}/{len(_gcse_api_keys)}..."
+                    )
+            else:
+                logging.error(f"❌ [Google CSE Tool] HTTP error: {e}")
+                return f"Search failed with error: {str(e)}"
+        except Exception as e:
+            logging.error(f"❌ [Google CSE Tool] Unexpected error: {e}")
+            return f"Search failed with error: {str(e)}"
+
+    logging.error("❌ [Google CSE Tool] All API keys exhausted (all returned 429).")
+    return "Search failed with error: All Google CSE API keys have exceeded their rate limits."
 
 google_custom_search_tool = Tool.from_function(
     func=google_custom_search_with_fallback,
