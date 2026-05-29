@@ -536,6 +536,7 @@ class CheckImageTool(BaseTool):
     #     return {"image_url": img_url, "description": resp.content}
 
     async def _arun(self, img_url: str) -> Dict[str, str]:
+        logging.info(f"🔎 [Check Image Tool] : {img_url}")
         try:
             async with httpx.AsyncClient(verify=False) as client:
                 resp = await client.get(img_url, follow_redirects=True, timeout=10.0)

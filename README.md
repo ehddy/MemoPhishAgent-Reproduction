@@ -169,8 +169,8 @@ docker run --rm \
 
 | 파일 | 내용 |
 | --- | --- |
-| `results/mixed_result.json` | 판별 결과 JSON (`url`, `ground_truth`, `malicious`, `confidence`, `reason`) |
-| `results/mixed_result.tsv` | TSV: `folder / url / ground_truth / prediction / confidence / reason` |
+| `results/mixed_result.json` | 판별 결과 + run_info (토큰·LLM 호출·처리 시간 포함) |
+| `results/mixed_result.tsv` | TSV 요약: `folder / url / ground_truth / prediction / confidence / reason` |
 | `results/mixed_result_failed_urls.txt` | 처리 실패 URL 목록 (있을 경우) |
 
 ### 5. Run locally with Conda
@@ -248,31 +248,30 @@ python src/test_dataset.py \
 
 ### 6. Evaluate results
 
-배치 평가 결과 TSV를 받아 분류 지표를 출력합니다.
-`folder == "unknown"` 행(에이전트가 자체 크롤한 서브 URL)과 동일 폴더 중복 행은 자동으로 제거합니다.
-실패한 URL도 `benign`으로 TSV에 자동 기록되므로 항상 입력 수 = 결과 수가 보장됩니다.
+`test_dataset.py`가 출력한 JSON 파일을 입력으로 받아 분류 지표와 비용 통계를 출력합니다.
+중복 제거는 `test_dataset.py` 단계에서 이미 완료되므로 JSON을 그대로 사용합니다.
 
 **혼합 모드 결과 평가** (`--phish-root` + `--benign-root` 실행 결과):
 
 ```bash
-python evaluate.py --mixed results/mixed_result_<timestamp>.tsv
+python evaluate.py --mixed results/mixed_result_<timestamp>.json
 ```
 
 **단일 클래스 모드 결과 평가** (피싱/정상 각각 실행 후):
 
 ```bash
 python evaluate.py \
-  --phish  results/openphish_result_<timestamp>.tsv \
-  --benign results/tranco_result_<timestamp>.tsv
+  --phish  results/openphish_result_<timestamp>.json \
+  --benign results/tranco_result_<timestamp>.json
 ```
 
 Sample output:
 
 ```text
-==================================================
+=======================================================
   MemoPhishAgent Evaluation Results
-==================================================
-  Dataset       phish=10  benign=10  total=20
+=======================================================
+  Dataset  phish=10  benign=10  total=20
 
   [Confusion Matrix]
     TP=8  FP=2
@@ -283,15 +282,22 @@ Sample output:
     Precision : 0.8000
     Recall    : 0.8000
     F1 Score  : 0.8000
-==================================================
-```
 
-샘플 TSV(단일 클래스 형식)는 `results/samples/`에 있어 바로 테스트해볼 수 있습니다:
+  [Processing Stats]
+    URLs total    : 20  (completed=20, failed=0)
+    Elapsed total : 612.4s
+    Elapsed avg   : 30.62s / URL
 
-```bash
-python evaluate.py \
-  --phish  results/samples/sample_openphish.tsv \
-  --benign results/samples/sample_tranco.tsv
+  [LLM Call Stats]
+    LLM calls total : 118
+    LLM calls avg   : 5.90 / URL
+
+  [Token Usage]
+    Model : claude-sonnet-4-6
+      Input  tokens :    345,210  (avg  17260.5 / URL)
+      Output tokens :     24,680  (avg   1234.0 / URL)
+      Total  tokens :    369,890  (avg  18494.5 / URL)
+=======================================================
 ```
 
 ---
